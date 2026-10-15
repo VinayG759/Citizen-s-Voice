@@ -32,6 +32,13 @@ test("says the database is unreachable instead of pretending all is well", async
   expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
 });
 
+test("a degraded server is never shown as healthy, even when the database is fine", async () => {
+  mockFetch({ "/health": { status: "degraded", db: "ok", version: "0.1.0" }, "/api/config": {} });
+  render(<App />);
+  expect(await screen.findByText("Some services degraded")).toBeInTheDocument();
+  expect(screen.queryByText("All systems working")).not.toBeInTheDocument();
+});
+
 test("a network failure gives a plain-language message, not raw error text", async () => {
   mockFetch({ "/health": new TypeError("Failed to fetch"), "/api/config": new TypeError("Failed to fetch") });
   render(<App />);

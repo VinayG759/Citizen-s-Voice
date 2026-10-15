@@ -24,4 +24,7 @@ USER appuser
 # DigitalOcean App Platform sets PORT (8080 by default).
 EXPOSE 8080
 # Apply any new database migrations, then start the server.
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080} --proxy-headers --forwarded-allow-ips='*'"]
+# No --proxy-headers / --forwarded-allow-ips: trusting X-Forwarded-For from anyone
+# would let a visitor fake their IP. Where we need the client IP (rate limits), we
+# read the header DigitalOcean's load balancer sets, which visitors cannot forge.
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}"]

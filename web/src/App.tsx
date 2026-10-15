@@ -77,11 +77,11 @@ function SystemStatus({ status, onRetry }: { status: Status; onRetry: () => void
         </Button>
       </div>
     );
-  return status.health.db === "ok" ? (
-    <Badge tone="success">All systems working</Badge>
-  ) : (
+  // The server's overall verdict decides; the database is named only when it is the cause.
+  if (status.health.status === "ok") return <Badge tone="success">All systems working</Badge>;
+  return (
     <div className="status">
-      <Badge tone="warning">Database unreachable</Badge>
+      <Badge tone="warning">{status.health.db === "down" ? "Database unreachable" : "Some services degraded"}</Badge>
       <Button size="sm" variant="ghost" onClick={onRetry}>
         <RefreshCw size={14} aria-hidden="true" /> Try again
       </Button>

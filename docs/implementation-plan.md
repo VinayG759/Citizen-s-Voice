@@ -323,7 +323,7 @@ Steps:
    - **Typing** as an alternative (quiet rooms, accessibility).
    - Gemma's steps shown inline; the filed complaint links to its detail page.
    - The `speech/` STT wrapper is first built here (a simple Sarvam request); Phase 3 reuses it. TTS comes from Phase 1.
-   - Misuse: max 30 s per recording, max 30 turns per session, per-IP rate limit (e.g. 20 turns/10 min); complaints from this page are marked `channel=web`.
+   - Misuse: max 30 s per recording, max 30 turns per session, per-IP rate limit (e.g. 20 turns/10 min); complaints from this page are marked `channel=web`. **Client IP:** read it from the header DigitalOcean's load balancer sets (believed to be `do-connecting-ip` — verify on the live app), never from `X-Forwarded-For`, which visitors can fake (ShipWright review, PR #2).
    - Browser asks for microphone permission; if refused, the page says so and offers typing (UI rule: disable what can't work and say why).
 8. **Golden conversations** — 12 scripted test complaints (Kannada, Hindi, English, mixed; clear, vague, wrong place, off-topic, emergency-like). Each states the expected outcome (filed with category X near place Y / asked for location / closed politely). A script runs them against real Gemma and prints a pass table. Target: 10/12 before Phase 3.
 9. Unit tests for tools and the filing rule (with a fake LLM).
