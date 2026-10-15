@@ -16,8 +16,8 @@ G2, voice-first AI). All code written from 14 October 2026.
 |---|---|---|
 | 0 | Foundation: API, dashboard shell, database, health check | ✅ merged 16 Oct |
 | 2 | Gemma clerk + try-it page (speak or type in the browser) | ✅ built 16 Oct; 12/12 scripted conversations pass against the real Gemma; browser microphone not yet tried by a person |
-| 1 | Phone line answers | ⏳ next — needs the live server URL |
-| 3–8 | Voice loop on the phone, live dashboard + map, smarter clerk, photo check + call-back, demo hardening | planned |
+| 1 + 3 | Phone line: Vobiz audio stream → end-of-speech detection → Sarvam → Gemma clerk → Sarvam voice; "one moment" filler; silence nudge; hang-up after filing | ✅ built 16 Oct and tested with a simulated call (real Sarvam + real Gemma); **not yet tried on a real phone** — needs the live server URL |
+| 4–8 | Live dashboard + map, smarter clerk, photo check + call-back, demo hardening | planned |
 
 The full plan is in [docs/implementation-plan.md](docs/implementation-plan.md)
 ([plain-language version](docs/implementation-plan-simple.md)).
@@ -75,7 +75,7 @@ Production: one container (see [Dockerfile](Dockerfile)) — FastAPI serves the 
 ## Tests
 
 ```bash
-cd backend && python -m pytest          # 28 tests: safety rules, tools, try-it API (fakes, no network)
+cd backend && python -m pytest          # 38 tests: safety rules, tools, try-it API, phone line (fakes, no network)
 cd web && npm test                      # 7 tests
 cd backend && python -m scripts.golden  # 12 scripted conversations against the REAL Gemma (no DB writes)
 ```

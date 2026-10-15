@@ -1,18 +1,29 @@
 """Citizen's Voice — one FastAPI service: the API, and the built dashboard as static files."""
 
+import logging
+import threading
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import try_it
+from app.api import phone, try_it
 from app.db.session import database_is_up
+from app.phone.call import warm_clips
 from app.settings import get_settings
 
 WEB_DIST = Path(__file__).resolve().parents[2] / "web" / "dist"
 
 app = FastAPI(title="Citizen's Voice", version=get_settings().app_version)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+
+@app.on_event("startup")
+def prepare_phone_clips() -> None:
+    # Speak the fixed phone lines once in the background, so the first caller isn't kept waiting.
+    if get_settings().sarvam_api_key:
+        threading.Thread(target=warm_clips, daemon=True).start()
 
 
 @app.get("/health")
@@ -41,6 +52,7 @@ def public_config() -> dict:
 
 
 app.include_router(try_it.router)
+app.include_router(phone.router)
 
 # API routers are included ABOVE this line: the dashboard catch-all below must
 # be registered last, or it would swallow API addresses.

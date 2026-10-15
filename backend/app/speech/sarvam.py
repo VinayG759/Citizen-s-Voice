@@ -1,7 +1,9 @@
 """Sarvam: the ears (speech → text) and the mouth (text → speech). Nothing else."""
 
 import base64
+import io
 import time
+import wave
 from dataclasses import dataclass
 
 import httpx
@@ -46,8 +48,8 @@ def transcribe(audio: bytes, filename: str = "speech.webm", content_type: str = 
                  int((time.perf_counter() - t0) * 1000))
 
 
-def speak(text: str, language: str) -> tuple[bytes, int]:
-    """WAV audio of `text`, and how long Sarvam took (ms)."""
+def speak(text: str, language: str, sample_rate: int | None = None) -> tuple[bytes, int]:
+    """WAV audio of `text`, and how long Sarvam took (ms). Phone calls ask for 16000 Hz."""
     s = get_settings()
     lang = language if language in TTS_LANGUAGES else "en-IN"
     t0 = time.perf_counter()
@@ -55,12 +57,28 @@ def speak(text: str, language: str) -> tuple[bytes, int]:
         r = httpx.post(
             TTS_URL,
             headers={"api-subscription-key": s.sarvam_api_key},
-            json={"text": text[:1500], "target_language_code": lang, "model": s.sarvam_tts_model},
+            json={"text": text[:1500], "target_language_code": lang, "model": s.sarvam_tts_model,
+                  **({"speech_sample_rate": sample_rate} if sample_rate else {})},
             timeout=20,
         )
     except httpx.HTTPError as e:
         raise SpeechError(f"tts {type(e).__name__}") from e
     if r.status_code != 200:
         raise SpeechError(f"tts HTTP {r.status_code}")
-    audio = base64.b64decode("".join(r.json()["audios"]))
-    return audio, int((time.perf_counter() - t0) * 1000)
+    return _join_wavs([base64.b64decode(a) for a in r.json()["audios"]]), int((time.perf_counter() - t0) * 1000)
+
+
+def _join_wavs(parts: list[bytes]) -> bytes:
+    """Sarvam may return long speech in several WAV pieces: join their audio into one WAV."""
+    if len(parts) == 1:
+        return parts[0]
+    frames, params = [], None
+    for p in parts:
+        with wave.open(io.BytesIO(p)) as w:
+            params = params or w.getparams()
+            frames.append(w.readframes(w.getnframes()))
+    out = io.BytesIO()
+    with wave.open(out, "wb") as w:
+        w.setparams(params)
+        w.writeframes(b"".join(frames))
+    return out.getvalue()
