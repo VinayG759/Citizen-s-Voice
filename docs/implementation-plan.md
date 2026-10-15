@@ -318,11 +318,17 @@ Steps:
 4. `tools/`: `find_place`, `file_complaint`, `get_complaint_status`, `find_nearby_complaints` (stub returning none until Phase 5), `raise_emergency` (stub until Phase 5). Typed inputs, validated by code.
 5. `clerk/`: system prompt (the clerk's role, **everyday language rule** — speak the way Bengaluru people actually talk: casual spoken Kannada mixed with common English words (road, problem, pothole, area, landmark, okay), Kannada words in Kannada script, English words in English letters; same idea for Hindi/Hinglish; never bookish — tested 2026-10-15, Gemma 31B + Sarvam bulbul:v3 handle it well; **no gendered address** ("sir/madam") — the caller's gender is unknown; **never re-ask what the caller already said** — the prompt carries a "known so far" block; reply in the caller's language, short sentences fit for speech, one question at a time, read back before filing, speak the tracking ID digit by digit), turn loop, `clerk_events` logging.
 6. Tracking IDs: `CV-` + sequence from 1001; spoken as "C V one zero four two" in the caller's language.
-7. Simulator page (`/try`): chat box, language shown, Gemma's steps shown inline.
+7. **Try-it page (`/try`)** — the judges' way in. The handbook says judges *test the live URL*, so the website itself must be voice-first, not only the phone:
+   - **Microphone button:** hold to speak → browser records (MediaRecorder) → `POST /api/try/turn` → Sarvam STT → **the same clerk** → reply text + Sarvam TTS audio played in the browser. Language auto-detected.
+   - **Typing** as an alternative (quiet rooms, accessibility).
+   - Gemma's steps shown inline; the filed complaint links to its detail page.
+   - The `speech/` STT wrapper is first built here (a simple Sarvam request); Phase 3 reuses it. TTS comes from Phase 1.
+   - Misuse: max 30 s per recording, max 30 turns per session, per-IP rate limit (e.g. 20 turns/10 min); complaints from this page are marked `channel=web`.
+   - Browser asks for microphone permission; if refused, the page says so and offers typing (UI rule: disable what can't work and say why).
 8. **Golden conversations** — 12 scripted test complaints (Kannada, Hindi, English, mixed; clear, vague, wrong place, off-topic, emergency-like). Each states the expected outcome (filed with category X near place Y / asked for location / closed politely). A script runs them against real Gemma and prints a pass table. Target: 10/12 before Phase 3.
 9. Unit tests for tools and the filing rule (with a fake LLM).
 
-**Done when:** in the simulator, a Kannada pothole complaint near Presidency University ends with a tracking ID and the right coordinates; golden conversations ≥ 10/12.
+**Done when:** on the try-it page, a Kannada pothole complaint near Presidency University — **spoken into the laptop microphone** — ends with a spoken tracking ID and the right coordinates; golden conversations ≥ 10/12.
 
 ---
 
@@ -525,5 +531,6 @@ Direction: **calm, premium, clear — not decorative.** When "prettier" and "cle
 ## 8. Log
 
 - **2026-10-14** — Project started; name changed from "Kelu" to Citizen's Voice.
+- **2026-10-16** — Handbook read in full (docs/notion-page.md): judges test the live URL → try-it page gets a microphone (Phase 2); Sarvam is a Technology Partner; misleading submissions / artificial PRs can disqualify; official rule is only "meaningful use of Gemma 4".
 - **2026-10-16** — Hosting: DigitalOcean App Platform (Render free as backup). Track text read: "via the Gemini API", "text and images", "lightweight". Brain switched to **Gemini API primary** (26B A4B live, 31B background), OpenRouter fallback; organisers asked if OpenRouter counts. Phase 6 (photo check + call-back) made core. Apache-2.0 licence added to Phase 0. Everyday-language rule added.
 - **2026-10-15** — Kannada audio test on Colab (Gemma 4 E4B): meaning understood, two words misheard, slow due to GPU memory spill. Hosted APIs checked: no provider serves audio-capable Gemma 4. Decision: Sarvam for speech, Gemma 4 31B (OpenRouter) as the brain. Feature tiers agreed. This plan written. Latency measured (section 3): Gemma 4 31B on OpenRouter chosen; Google API demoted; Sarvam keys verified. Public repo created by Vinay: https://github.com/VinayG759/Citizen-s-Voice
