@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.api import try_it
 from app.db.session import database_is_up
 from app.settings import get_settings
 
@@ -38,6 +39,8 @@ def public_config() -> dict:
     number = get_settings().vobiz_phone_number
     return {"helpline_number": number, "helpline_display": display_phone(number) if number else ""}
 
+
+app.include_router(try_it.router)
 
 # API routers are included ABOVE this line: the dashboard catch-all below must
 # be registered last, or it would swallow API addresses.

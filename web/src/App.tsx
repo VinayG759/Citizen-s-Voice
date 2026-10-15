@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Phone, RefreshCw } from "lucide-react";
+import { Mic, Phone, RefreshCw } from "lucide-react";
+import { AppHeader } from "./components/AppHeader";
 import { Badge } from "./components/Badge";
 import { Button } from "./components/Button";
 import { Card } from "./components/Card";
@@ -35,24 +36,20 @@ export function App() {
 
   return (
     <div className="page">
-      <header className="page__header">
-        <div className="brand">
-          <img src="/favicon.svg" alt="" width={32} height={32} />
-          <div>
-            <h1 className="brand__name">Citizen's Voice</h1>
-            <p className="brand__tagline">Report civic problems by phone, in your own language</p>
-          </div>
-        </div>
+      <AppHeader>
         <SystemStatus status={status} onRetry={check} />
-      </header>
+        <a className="btn btn--primary" href="/try">
+          <Mic size={16} aria-hidden="true" /> Try it in your browser
+        </a>
+      </AppHeader>
 
       <main className="page__main">
         <Card title="Complaints">
           <EmptyState icon={<Phone size={32} />} title="No complaints yet">
             {config?.helpline_display ? (
               <p>
-                Call <a href={`tel:${config.helpline_number}`}>{config.helpline_display}</a> and describe the problem in
-                Kannada, Hindi or English. It will appear here.
+                Call <a href={`tel:${config.helpline_number}`}>{config.helpline_display}</a> or{" "}
+                <a href="/try">talk to it in your browser</a>, and describe the problem in Kannada, Hindi or English.
               </p>
             ) : (
               <p>When citizens call the helpline, their complaints will appear here.</p>

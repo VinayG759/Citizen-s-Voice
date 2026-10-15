@@ -1,0 +1,76 @@
+"""Database reads and writes the features need. Plain functions; one short transaction each."""
+
+from dataclasses import dataclass
+from datetime import datetime
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.db.models import Call, ClerkEvent, Complaint, Turn
+from app.db.session import get_engine
+
+
+@dataclass
+class FiledComplaint:
+    id: int
+    tracking_number: int
+
+    @property
+    def tracking_id(self) -> str:
+        return f"CV-{self.tracking_number}"
+
+
+@dataclass
+class ComplaintStatus:
+    tracking_id: str
+    status: str
+    category: str
+    summary_en: str
+    place_name: str | None
+    created_at: datetime
+
+
+class Repo:
+    """The real database. Tests use a fake with the same methods."""
+
+    def start_call(self, channel: str, caller_hash: str | None = None, vobiz_call_id: str | None = None) -> int:
+        with Session(get_engine()) as s, s.begin():
+            call = Call(channel=channel, caller_hash=caller_hash, vobiz_call_id=vobiz_call_id)
+            s.add(call)
+            s.flush()
+            return call.id
+
+    def end_call(self, call_id: int, outcome: str | None, complaint_id: int | None = None) -> None:
+        with Session(get_engine()) as s, s.begin():
+            call = s.get(Call, call_id)
+            if call:
+                call.ended_at = datetime.now().astimezone()
+                call.outcome = outcome
+                call.complaint_id = complaint_id or call.complaint_id
+
+    def add_turn(self, call_id: int, speaker: str, text_local: str | None, language: str | None,
+                 stt_ms: int | None = None, llm_ms: int | None = None, tts_ms: int | None = None) -> None:
+        with Session(get_engine()) as s, s.begin():
+            s.add(Turn(call_id=call_id, speaker=speaker, text_local=text_local, language=language,
+                       stt_ms=stt_ms, llm_ms=llm_ms, tts_ms=tts_ms))
+
+    def add_events(self, call_id: int, events: list[dict]) -> None:
+        if not events:
+            return
+        with Session(get_engine()) as s, s.begin():
+            s.add_all(ClerkEvent(call_id=call_id, kind=e["kind"], payload=e) for e in events)
+
+    def file_complaint(self, **fields) -> FiledComplaint:
+        with Session(get_engine()) as s, s.begin():
+            c = Complaint(**fields)
+            s.add(c)
+            s.flush()
+            s.refresh(c)
+            return FiledComplaint(c.id, c.tracking_number)
+
+    def complaint_status(self, tracking_number: int) -> ComplaintStatus | None:
+        with Session(get_engine()) as s:
+            c = s.scalar(select(Complaint).where(Complaint.tracking_number == tracking_number))
+            if not c:
+                return None
+            return ComplaintStatus(c.tracking_id, c.status, c.category, c.summary_en, c.place_name, c.created_at)

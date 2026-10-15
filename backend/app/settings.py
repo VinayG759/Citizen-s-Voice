@@ -27,8 +27,19 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     openrouter_api_key: str = ""
 
+    # Which Gemma does which job (Gemini API names; OpenRouter adds "google/").
+    llm_live_model: str = "gemma-4-26b-a4b-it"  # a caller is waiting: lightweight, thinking off
+    llm_background_model: str = "gemma-4-31b-it"  # nobody waiting: bigger, thinking on
+    # After this long, a live turn gives up on Google and asks OpenRouter instead.
+    llm_primary_timeout_s: float = 4.0
+
     # Sarvam — speech to text and text to speech.
     sarvam_api_key: str = ""
+    sarvam_stt_model: str = "saaras:v3"  # codemix mode keeps English words in English letters
+    sarvam_tts_model: str = "bulbul:v3"
+
+    # Keyed hash for caller phone numbers / web sessions. Set a long random value in production.
+    caller_hash_key: str = "dev-only-not-secret"
 
     # Vobiz — the phone line.
     vobiz_auth_id: str = ""
