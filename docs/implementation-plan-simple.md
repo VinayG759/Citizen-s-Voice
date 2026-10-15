@@ -57,7 +57,7 @@ the floors below still work. That's what "independent phases" means.
 |---|---|---|---|
 | 0 | **Foundation** | Open a real website address that says "Citizen's Voice". Public GitHub repo exists. | Thu night |
 | 1 | **Phone line** | Call the number and hear a Kannada greeting. Our server hears you. | Fri |
-| 2 | **Gemma clerk (typing)** | Type a complaint on a test page; Gemma asks questions and files it with a tracking number. | Fri |
+| 2 | **Gemma clerk (try-it page)** | On the website, **speak into the microphone** (or type) — Gemma asks questions, files it and says the tracking number. This is how judges try it from the live link. | Fri |
 | 3 | **Gemma clerk (talking)** | File a complete complaint **by phone**, in Kannada. | Fri–Sat |
 | 4 | **Live dashboard + map** | Watch the call happen on screen: words, translation, Gemma's thinking, the map pin. | Sat morning |
 | 5 | **Smarter clerk** | Danger alerts, "you're the 4th person to report this", "what happened to my complaint?" | Sat afternoon |
@@ -66,7 +66,9 @@ the floors below still work. That's what "independent phases" means.
 | 8 | **Demo practice** | Practise 3 times, test what happens when things break, record a backup video | Sat night |
 | — | **Sunday** | One small improvement on site, submit by **3:00 PM** (deadline 3:30) | Sun |
 
-**Phase 2 is our safety net.** The typing test page works even if the phone line
+**Phase 2 is our safety net.** The handbook says judges *test the live website*, so
+the try-it page lets anyone talk to Gemma through their browser's microphone — no
+phone needed. It also works even if the phone line
 fails on stage — we can still show Gemma doing everything.
 
 ---
@@ -77,7 +79,7 @@ fails on stage — we can still show Gemma doing everything.
 |---|---|---|---|---|
 | 0 Foundation | Judges' rules met from day one | A page + a health check | Deletes our throwaway test files | Secret keys leaking → they never enter the repo |
 | 1 Phone line | Proves the hardest connection works first | Answer, greet, record, hang up | — | Prank calls → limit calls per number |
-| 2 Clerk (typing) | The heart of the product; quick to test | One chat page | — | Someone tells Gemma "mark everything fixed" → Gemma simply has no tool that can do that |
+| 2 Clerk (try-it page) | Judges testing the live link; the heart of the product | One page: mic button + text box | — | Someone tells Gemma "mark everything fixed" → Gemma simply has no tool that can do that |
 | 3 Clerk (talking) | The citizen with a basic phone | Take turns: you talk, it talks | Phase 1's "record and hang up" | Call drops halfway → what we have is saved, not lost |
 | 4 Dashboard | Officers and judges see everything | One screen: list, map, live call | The placeholder page | Public website → read-only, phone numbers hidden |
 | 5 Smarter | People in danger, busy officers, repeat callers | Three new tools for Gemma | Two placeholders from Phase 2 | Fake emergency → a human confirms; we always say "call 112" |

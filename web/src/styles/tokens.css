@@ -1,0 +1,62 @@
+/* Design tokens — the ONLY place colours, spacing and type are defined.
+   Components use var(--…); no hex values anywhere else (UI rule 1).
+   Light theme only: the dashboard is shown on projectors, where light reads best. */
+
+:root {
+  /* Surfaces */
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-sunken: #eef0f4;
+  --border: #dfe3ea;
+
+  /* Text — contrast on --surface: 15.9:1 and 7.0:1 (WCAG AA needs 4.5:1) */
+  --text: #111827;
+  --text-muted: #4b5563;
+
+  /* One accent colour. #1d4ed8 on white is 6.7:1. */
+  --accent: #1d4ed8;
+  --accent-hover: #1e40af;
+  --accent-soft: #e8eefc;
+  --on-accent: #ffffff;
+
+  /* Feedback */
+  --success: #15803d;
+  --success-soft: #e7f6ec;
+  --warning: #b45309;
+  --warning-soft: #fdf3e3;
+  --danger: #b91c1c;
+  --danger-soft: #fdecec;
+  --on-danger: #ffffff;
+
+  /* Data palette: complaint urgency 1 (low) → 5 (emergency). Used for map pins and badges. */
+  --urgency-1: #64748b;
+  --urgency-2: #0e7490;
+  --urgency-3: #b45309;
+  --urgency-4: #c2410c;
+  --urgency-5: #b91c1c;
+
+  --focus-ring: 0 0 0 3px rgba(29, 78, 216, 0.45);
+
+  /* Spacing: 4px scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+
+  /* Type: two weights only (400, 600). Noto Sans Kannada covers Kannada script. */
+  --font: "Inter", "Noto Sans Kannada", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.75rem;
+  --weight-normal: 400;
+  --weight-strong: 600;
+
+  --shadow: 0 1px 2px rgba(17, 24, 39, 0.06), 0 1px 3px rgba(17, 24, 39, 0.08);
+}
