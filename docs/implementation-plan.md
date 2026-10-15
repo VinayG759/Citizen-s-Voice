@@ -32,7 +32,7 @@ live; nothing is synthetic.
 | New code only | Every line written from 14 Oct in this repo. Sangam (`Desktop\sangam`) is read for **ideas and lessons only** — no code copied. |
 | Gemma is the brain | **Primary: Gemini API** (the track says "via the Gemini API"). **Live call turns:** Gemma 4 **26B A4B**, thinking off (`thinkingLevel: "minimal"`), plus a code-side language check. **Background jobs** (urgency, duplicates, photo checks): Gemma 4 **31B** via Gemini API, thinking on — its reasoning feeds "Gemma's mind". **Fallback:** the same model via OpenRouter when Google errors or takes > 3 s. Provider order and models are settings. If Google's free tier is too flaky, Vinay may add $2–3 of Gemini credit (check first that paying actually improves Gemma's capacity). Organisers asked whether OpenRouter counts — answer pending; whatever we say about providers must match the code. |
 | Sarvam is ears and mouth | Sarvam speech-to-text (STT) and text-to-speech (TTS). Credited in README. |
-| Pitch | Gemma is the hero. Never claim Gemma hears the voice. If asked, say plainly that Sarvam converts speech. |
+| Pitch | Gemma is the hero (the brain). **Sarvam is an official Technology Partner of the event** (handbook, read 16 Oct) — name it proudly as the ears and mouth; never claim Gemma hears the voice. |
 | Telephony | Vobiz (Vinay has ~30,000 credits). |
 | No SMS | India's DLT template registration takes days. The tracking ID is spoken on the call and shown on the dashboard. |
 | Why not Gemma's own audio | Tested 15 Oct: Gemma 4 E4B (the audio-capable size) is not offered by any API; self-hosting needs a paid GPU; on Colab it misheard ಹಳ್ಳಗಳು → ಹಲ್ಲೆಗಳು and ರಾಜಾನುಕುಂಟೆ → "Rajan Kunte". |

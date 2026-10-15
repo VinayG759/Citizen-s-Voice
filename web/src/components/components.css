@@ -1,0 +1,164 @@
+/* Shared component styles. Tokens only — see styles/tokens.css. */
+
+/* Button */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-weight: var(--weight-strong);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.btn--sm {
+  min-height: 32px;
+  padding: 0 var(--space-3);
+}
+.btn--primary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.btn--primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+.btn--secondary {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+.btn--secondary:hover:not(:disabled) {
+  background: var(--surface-sunken);
+}
+.btn--ghost {
+  background: transparent;
+  color: var(--text);
+}
+.btn--ghost:hover:not(:disabled) {
+  background: var(--surface-sunken);
+}
+.btn--danger {
+  background: var(--danger);
+  color: var(--on-danger);
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 700ms linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Badge */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border-radius: 999px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-strong);
+  line-height: 1.4;
+}
+.badge--neutral {
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+}
+.badge--success {
+  background: var(--success-soft);
+  color: var(--success);
+}
+.badge--warning {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.badge--danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+/* Card */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  padding: var(--space-5);
+}
+.card__title {
+  font-size: var(--text-md);
+  margin-bottom: var(--space-3);
+}
+
+/* Empty state */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-7) var(--space-5);
+  text-align: center;
+  color: var(--text-muted);
+}
+.empty__icon {
+  color: var(--accent);
+}
+.empty__title {
+  color: var(--text);
+  font-size: var(--text-lg);
+}
+
+/* Toasts */
+.toaster {
+  position: fixed;
+  right: var(--space-5);
+  bottom: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  z-index: 100;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 280px;
+  max-width: 420px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--text);
+  color: var(--surface);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  font-size: var(--text-sm);
+}
+.toast--error {
+  background: var(--danger);
+  color: var(--on-danger);
+}
+.toast__message {
+  flex: 1;
+}
+.toast__close {
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  padding: var(--space-1);
+  display: inline-flex;
+}
