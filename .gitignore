@@ -1,0 +1,24 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# personal recordings (never in the public repo)
+*.ogg
+*.opus
+*.m4a
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# web
+node_modules/
+web/dist/
+
+# editors / OS
+.vscode/
+.DS_Store
+Thumbs.db
