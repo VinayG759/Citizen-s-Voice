@@ -7,13 +7,14 @@ positions for complaints: Gemma proposes a place name, this code looks it up.
 
 import csv
 import gzip
+import json
 import math
 import re
 from dataclasses import asdict, dataclass
 from functools import lru_cache
 from pathlib import Path
 
-from rapidfuzz import fuzz
+from rapidfuzz import fuzz, process
 
 GAZETTEER = Path(__file__).resolve().parents[2] / "data" / "gazetteer.csv.gz"
 
@@ -24,8 +25,8 @@ MIN_SCORE = 70.0
 
 # Words callers add that are not part of a place's name.
 _FILLER = re.compile(
-    r"\b(near|opposite|opp|behind|beside|next to|road|rd|main|cross|gate|stop|bus stop|the|in|at)\b|"
-    r"(ಹತ್ತಿರ|ಎದುರು|ಹಿಂದೆ|ಪಕ್ಕ|ರಸ್ತೆ|ಗೇಟ್)"
+    r"\b(near|opposite|opp|behind|beside|next to|road|rd|main|cross|stop|bus stop|the|in|at)\b|"
+    r"(ಹತ್ತಿರ|ಎದುರು|ಹಿಂದೆ|ಪಕ್ಕ|ರಸ್ತೆ)"
 )
 
 
@@ -38,6 +39,7 @@ class Place:
     lat: float
     lon: float
     area: str
+    alt: str = ""  # everyday / former names, "|"-separated ("Majestic")
 
     @property
     def label(self) -> str:
@@ -68,7 +70,8 @@ def normalise(text: str) -> str:
 def load() -> tuple[Place, ...]:
     with gzip.open(GAZETTEER, "rt", encoding="utf-8") as f:
         return tuple(
-            Place(r["id"], r["name_en"], r["name_kn"], r["kind"], float(r["lat"]), float(r["lon"]), r["area"])
+            Place(r["id"], r["name_en"], r["name_kn"], r["kind"], float(r["lat"]), float(r["lon"]), r["area"],
+                  r.get("alt", ""))
             for r in csv.DictReader(f)
         )
 
@@ -103,8 +106,12 @@ def _stem(text: str) -> tuple[str, bool]:
 
 _GENERIC = {"railway", "station", "bus", "stand", "stop", "hospital", "clinic", "school", "college",
             "temple", "church", "mosque", "park", "market", "circle", "junction", "layout", "colony",
-            "flyover", "bridge", "lake", "tank", "post", "office", "police", "government", "govt",
+            "flyover", "bridge", "lake", "tank", "post", "office", "police", "government", "govt", "gate",
             "primary", "high", "new", "old", "town", "main", "cross", "road", "nagar", "extension"}
+
+
+_KIND_RANK = {"village": 0, "town": 0, "suburb": 0, "neighbourhood": 0, "locality": 0, "quarter": 0, "hamlet": 0,
+              "gate": 1, "bus_stop": 3, "road": 4}
 
 
 # Words that say what KIND of place the caller means: matching kinds get a boost.
@@ -116,6 +123,7 @@ _KIND_WORDS = {
     "temple": ("place_of_worship",), "ದೇವಸ್ಥಾನ": ("place_of_worship",), "mosque": ("place_of_worship",),
     "church": ("place_of_worship",), "lake": ("water",), "ಕೆರೆ": ("water",), "park": ("park",),
     "bus": ("bus_stop", "bus_station"), "village": ("village", "hamlet"), "ಗ್ರಾಮ": ("village", "hamlet"),
+    "gate": ("gate",), "ಗೇಟ್": ("gate",),
 }
 
 
@@ -129,7 +137,7 @@ def _score(query: str, place: Place) -> float:
     if not q:
         return 0.0
     best = 0.0
-    for name in (place.name_en, place.name_kn):
+    for name in (place.name_en, place.name_kn, *place.alt.split("|")):
         if not name:
             continue
         n = normalise(name)
@@ -153,12 +161,44 @@ def _score(query: str, place: Place) -> float:
             if whole_has:
                 stems.append(whole_stem)
             s = min(s, max((fuzz.ratio(q_stem, st) for st in stems), default=0) + 15)
+        # The distinctive words must match, not just the generic ones: "Rajanukunte railway station"
+        # is not "Hejjala Railway Station" just because both say "railway station".
+        q_core = [w for w in q.split() if w not in _GENERIC]
+        n_core = [w for w in n.split() if w not in _GENERIC]
+        if q_core and n_core:
+            core = max(fuzz.token_set_ratio(" ".join(q_core), " ".join(n_core)),
+                       fuzz.ratio("".join(q_core), "".join(n_core)))  # "rajan kunte" = "rajanukunte"
+            s = min(s, core + 20)
         # Names made only of generic words ("Hospital", "Railway Station") pin down nothing,
         # even when the caller said exactly that; a real name ("Yelahanka New Town") is fine.
         if set(n.split()) <= _GENERIC and _name_counts().get(n, 0) > 1:
             s -= 15
         best = max(best, s)
     return best
+
+
+@lru_cache
+def _search_index() -> tuple[list[str], list[int]]:
+    """Every normalised name (English and Kannada) and which place it belongs to."""
+    texts, owners = [], []
+    for i, p in enumerate(load()):
+        for name in {normalise(p.name_en), normalise(p.name_kn), *(normalise(a) for a in p.alt.split("|"))} - {""}:
+            texts.append(name)
+            owners.append(i)
+    return texts, owners
+
+
+def _candidates(query: str, limit: int = 400) -> list[Place]:
+    """A fast first pass (rapidfuzz's bulk matcher, in C) so the detailed _score only runs on
+    a few hundred plausible names instead of every place in Bengaluru."""
+    q = normalise(query)
+    if not q:
+        return []
+    texts, owners = _search_index()
+    places = load()
+    hits = {owners[i] for scorer in (fuzz.token_set_ratio, fuzz.ratio)
+            for _, _, i in process.extract(q, texts, scorer=scorer, limit=limit, score_cutoff=45)}
+    return [places[i] for i in hits]
 
 
 @lru_cache
@@ -179,7 +219,7 @@ def find(query: str, area: str | None = None, limit: int = 3) -> list[Match]:
     if area and fuzz.ratio(normalise(area), normalise(query)) >= 85:
         area = None
     if area:
-        area_hits = sorted(places, key=lambda p: _score(area, p), reverse=True)[:1]
+        area_hits = sorted(_candidates(area), key=lambda p: _score(area, p), reverse=True)[:1]
         if area_hits and _score(area, area_hits[0]) >= 75:
             centre = area_hits[0]
 
@@ -196,7 +236,7 @@ def find(query: str, area: str | None = None, limit: int = 3) -> list[Match]:
             return near
 
     scored: list[tuple[float, Match]] = []
-    for p in places:
+    for p in _candidates(query):
         s = _score(query, p)
         if s < MIN_SCORE:  # bonuses below only help names that already match well
             continue
@@ -208,12 +248,15 @@ def find(query: str, area: str | None = None, limit: int = 3) -> list[Match]:
                 s -= 10
         if kinds and p.kind in kinds:
             s += 8
+        if "gate" in kinds and p.kind != "gate":
+            s -= 8  # "X gate": the gate itself, not the middle of X
         if p.kind == "road":
             s -= 3  # prefer a landmark over a long road with the same name
         scored.append((s, Match(p, min(s, 100.0), dist)))
 
-    # Rank on the uncapped score, so two "100"s still come out in the right order.
-    scored = [m for _, m in sorted(scored, key=lambda x: x[0], reverse=True)]
+    # Rank on the uncapped score, so two "100"s still come out in the right order; on a tie, an
+    # area beats a landmark beats a bus stop beats a road, then alphabetical — never by chance.
+    scored = [m for _, m in sorted(scored, key=lambda x: (-x[0], _KIND_RANK.get(x[1].place.kind, 2), x[1].place.label))]
     out: list[Match] = []
     seen: set[str] = set()
     for m in scored:
@@ -225,3 +268,61 @@ def find(query: str, area: str | None = None, limit: int = 3) -> list[Match]:
         if len(out) == limit:
             break
     return out
+
+
+# ---- roads: put the pin ON the road the caller names --------------------------------------
+
+ROADS = Path(__file__).resolve().parents[2] / "data" / "roads.json.gz"
+ROAD_SNAP_M = 600  # only move the pin onto the road if that road really passes this close
+
+_ROAD_WORDS = re.compile(r"\b(main road|road|rd|main|street|st|cross)\b|ರಸ್ತೆ")
+
+
+def normalise_road(text: str) -> str:
+    """'Kakolu Rd' and 'Kakolu Road' are the same road: compare without the road words."""
+    t = _ROAD_WORDS.sub(" ", text.lower().replace(",", " ").replace(".", " "))
+    return " ".join(t.split())
+
+
+@lru_cache
+def _roads() -> tuple[list[str], list[tuple[str, list]]]:
+    """Normalised road names (English and Kannada), each with (display name, road shapes)."""
+    if not ROADS.exists():
+        return [], []
+    with gzip.open(ROADS, "rt", encoding="utf-8") as f:
+        data = json.load(f)
+    texts, roads = [], []
+    for r in data:
+        for name in {normalise_road(r["name_en"]), normalise_road(r["name_kn"])} - {""}:
+            texts.append(name)
+            roads.append((r["name_en"] or r["name_kn"], r["ways"]))
+    return texts, roads
+
+
+def _nearest_on_segment(p, a, b) -> tuple[float, float, float]:
+    """Closest point on segment a-b to p, and its distance in metres (flat-earth: fine under ~1 km)."""
+    kx, ky = 111_320 * math.cos(math.radians(p[0])), 110_540
+    ax, ay = (a[1] - p[1]) * kx, (a[0] - p[0]) * ky
+    bx, by = (b[1] - p[1]) * kx, (b[0] - p[0]) * ky
+    dx, dy = bx - ax, by - ay
+    t = 0.0 if dx == dy == 0 else max(0.0, min(1.0, -(ax * dx + ay * dy) / (dx * dx + dy * dy)))
+    x, y = ax + t * dx, ay + t * dy
+    return p[0] + y / ky, p[1] + x / kx, math.hypot(x, y)
+
+
+def snap_to_road(lat: float, lon: float, road: str) -> tuple[float, float, str, float] | None:
+    """The point on the named road nearest (lat, lon): (lat, lon, road name, metres moved).
+    None if no road with that name passes within ROAD_SNAP_M — then the pin stays put."""
+    q = normalise_road(road)
+    texts, roads = _roads()
+    if not q or not texts:
+        return None
+    best = None
+    for _, _, i in process.extract(q, texts, scorer=fuzz.ratio, limit=25, score_cutoff=80):
+        name, ways = roads[i]
+        for pts in ways:
+            for a, b in zip(pts, pts[1:]):
+                y, x, d = _nearest_on_segment((lat, lon), a, b)
+                if d <= ROAD_SNAP_M and (best is None or d < best[3]):
+                    best = (y, x, name, d)
+    return best
