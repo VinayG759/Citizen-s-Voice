@@ -12,6 +12,7 @@ import json
 import logging
 import time
 
+from app import events
 from app.clerk.clerk import Conversation
 from app.phone import audio, vobiz
 from app.speech import sarvam
@@ -196,6 +197,7 @@ class PhoneCall:
         await asyncio.to_thread(vobiz.hang_up, self.call_uuid)
 
     def _end(self, outcome: str, complaint_id: int | None) -> None:
+        events.publish("call_ended", call_id=self.conv.call_id, channel="phone", outcome=outcome)
         try:
             self.conv.repo.end_call(self.conv.call_id, outcome, complaint_id)
         except Exception:

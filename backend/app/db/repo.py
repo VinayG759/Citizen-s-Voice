@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.db.models import Call, ClerkEvent, Complaint, Turn
@@ -74,3 +74,40 @@ class Repo:
             if not c:
                 return None
             return ComplaintStatus(c.tracking_id, c.status, c.category, c.summary_en, c.place_name, c.created_at)
+
+
+def public_complaint(c: Complaint) -> dict:
+    """What the public dashboard may show. Never a phone number or caller hash — only the last 4 digits."""
+    return {
+        "tracking_id": c.tracking_id, "status": c.status, "category": c.category,
+        "summary_en": c.summary_en, "summary_local": c.summary_local, "language": c.language,
+        "urgency": c.urgency, "is_emergency": c.is_emergency, "is_incomplete": c.is_incomplete,
+        "place_name": c.place_name, "landmark": c.landmark, "lat": c.lat, "lon": c.lon,
+        "since_when": c.since_when, "report_count": c.report_count, "channel": c.channel,
+        "caller_last4": c.caller_last4, "created_at": c.created_at.isoformat(),
+    }
+
+
+def list_complaints(limit: int = 200) -> list[dict]:
+    with Session(get_engine()) as s:
+        rows = s.scalars(select(Complaint).order_by(desc(Complaint.created_at)).limit(limit)).all()
+        return [public_complaint(c) for c in rows]
+
+
+def complaint_detail(tracking_number: int) -> dict | None:
+    """The complaint, plus the conversation that produced it and every step Gemma took."""
+    with Session(get_engine()) as s:
+        c = s.scalar(select(Complaint).where(Complaint.tracking_number == tracking_number))
+        if c is None:
+            return None
+        out = public_complaint(c)
+        call = s.scalar(select(Call).where(Call.complaint_id == c.id))
+        out["transcript"], out["steps"] = [], []
+        if call is not None:
+            out["transcript"] = [
+                {"speaker": t.speaker, "text": t.text_local, "language": t.language, "at": t.created_at.isoformat()}
+                for t in s.scalars(select(Turn).where(Turn.call_id == call.id).order_by(Turn.id))
+            ]
+            out["steps"] = [e.payload for e in s.scalars(
+                select(ClerkEvent).where(ClerkEvent.call_id == call.id).order_by(ClerkEvent.id))]
+        return out

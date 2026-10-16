@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
-import { TryPage, describe as describeStep } from "./TryPage";
+import { TryPage } from "./TryPage";
+import { describe as describeStep } from "./lib/steps";
 
 afterEach(() => vi.unstubAllGlobals());
 

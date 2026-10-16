@@ -18,6 +18,7 @@ import time
 from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import Response
 
+from app import events
 from app.clerk.clerk import Conversation
 from app.db.repo import Repo
 from app.phone import vobiz
@@ -116,6 +117,7 @@ async def stream(ws: WebSocket, token: str) -> None:
                 conv = Conversation(call_id=call_id, repo=repo, channel="phone",
                                     caller_hash=caller_hash, caller_last4=last4)
                 call = PhoneCall(ws, start.get("streamId", msg.get("streamId", "")), call_uuid, conv)
+                events.publish("call_started", call_id=call_id, channel="phone", caller_last4=last4)
                 fmt = start.get("mediaFormat", {})
                 if fmt.get("encoding") != "audio/x-l16" or fmt.get("sampleRate") != 16000:
                     log.warning("call %s: unexpected audio format %s", call_uuid, fmt)

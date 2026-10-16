@@ -6,6 +6,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 
+from app import events
 from app.clerk.prompt import system_prompt
 from app.llm import router
 from app.llm.types import LLMError, Msg
@@ -58,6 +59,14 @@ class Conversation:
     state: tools.ToolState = field(default_factory=tools.ToolState)
 
     def turn(self, caller_text: str, language: str | None = None) -> TurnResult:
+        """One caller turn; the dashboard hears about it as it finishes."""
+        result = self._turn(caller_text, language)
+        events.publish("turn", call_id=self.call_id, channel=self.channel, caller=caller_text,
+                       reply=result.reply, language=result.language, steps=result.events,
+                       complaint=result.complaint)
+        return result
+
+    def _turn(self, caller_text: str, language: str | None = None) -> TurnResult:
         if language:
             self.language = language
         lang = self.language.split("-")[0]

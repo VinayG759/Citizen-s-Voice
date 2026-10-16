@@ -1,5 +1,6 @@
 """Citizen's Voice — one FastAPI service: the API, and the built dashboard as static files."""
 
+import asyncio
 import logging
 import threading
 from pathlib import Path
@@ -8,7 +9,8 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import phone, try_it
+from app import events
+from app.api import complaints, phone, try_it
 from app.db.session import database_is_up
 from app.phone.call import warm_clips
 from app.settings import get_settings
@@ -19,6 +21,11 @@ app = FastAPI(title="Citizen's Voice", version=get_settings().app_version)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 # httpx logs every request URL at INFO; keep it quiet so no URL (or anything in one) reaches the logs.
 logging.getLogger("httpx").setLevel(logging.WARNING)
+
+
+@app.on_event("startup")
+async def connect_live_events() -> None:
+    events.attach_loop(asyncio.get_running_loop())
 
 
 @app.on_event("startup")
@@ -55,6 +62,7 @@ def public_config() -> dict:
 
 app.include_router(try_it.router)
 app.include_router(phone.router)
+app.include_router(complaints.router)
 
 # API routers are included ABOVE this line: the dashboard catch-all below must
 # be registered last, or it would swallow API addresses.

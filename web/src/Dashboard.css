@@ -1,0 +1,214 @@
+/* Dashboard (/) and complaint page (/c/…). Tokens only. */
+
+.dash {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr) minmax(280px, 380px);
+  gap: var(--space-4);
+  padding: var(--space-4);
+  height: calc(100vh - 73px); /* below the header: everything visible on a projector */
+  min-height: 560px;
+}
+
+.dash__list,
+.dash__live {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.dash__map {
+  min-height: 360px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.map {
+  width: 100%;
+}
+
+@media (max-width: 1100px) {
+  .dash {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+  .dash__map {
+    height: 420px;
+    order: -1; /* on a phone the map comes first */
+  }
+}
+
+.dash__alert {
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-weight: var(--weight-strong);
+}
+
+.dash__error {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: flex-start;
+  color: var(--danger);
+}
+
+/* Complaint feed */
+.feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.feed__item {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.feed__item--selected {
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+
+.feed__item--fresh {
+  background: var(--success-soft);
+}
+
+.feed__item--skeleton {
+  height: 72px;
+  background: var(--surface-sunken);
+  border-color: transparent;
+}
+
+.feed__select {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 100%;
+  padding: var(--space-3);
+  padding-right: 72px;
+  background: none;
+  border: 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.feed__top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.feed__time {
+  margin-left: auto;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.feed__summary {
+  font-size: var(--text-sm);
+}
+
+.feed__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.feed__open {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-strong);
+  color: var(--accent);
+}
+
+/* Live call panel */
+.chat--compact {
+  max-height: 38vh;
+}
+
+.chat--compact .chat__line {
+  max-width: 95%;
+  padding: var(--space-2) var(--space-3);
+}
+
+.live__steps-title {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin: var(--space-3) 0 var(--space-2);
+}
+
+.live__none {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+/* Complaint page */
+.detail__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .detail__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.detail__main,
+.detail__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.detail__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.detail__id {
+  font-size: var(--text-xl);
+}
+
+.detail__summary {
+  font-size: var(--text-lg);
+}
+
+.detail__local {
+  margin-top: var(--space-1);
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-2) var(--space-4);
+  margin: var(--space-4) 0 0;
+}
+
+.facts dt {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.facts dd {
+  margin: 0;
+}

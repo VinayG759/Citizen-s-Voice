@@ -17,6 +17,7 @@ import uuid
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 
+from app import events
 from app.clerk.clerk import Conversation
 from app.db.repo import Repo
 from app.settings import get_settings
@@ -90,6 +91,7 @@ def start() -> dict:
     with _lock:
         _prune()
         _sessions[sid] = (Conversation(call_id=call_id, repo=repo, channel="web", caller_hash=caller_hash), time.time())
+    events.publish("call_started", call_id=call_id, channel="web", greeting=GREETING["text"])
     if _greeting_audio is None:
         _greeting_audio, _ = _speak_b64(GREETING["text"], GREETING["language"])
     return {"session_id": sid, "greeting": GREETING["text"], "greeting_audio": _greeting_audio}
