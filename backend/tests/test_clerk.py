@@ -146,7 +146,10 @@ def test_when_gemma_is_unreachable_the_caller_is_asked_to_repeat(monkeypatch):
 @pytest.mark.parametrize("text,lang,expected", [
     ("ಯಾವ area ಅಲ್ಲಿ ಈ பிரச்சினை?", "kn-IN", "ta"),  # Tamil word in a Kannada reply (seen in testing)
     ("ಯಾವ area ಅಲ್ಲಿ ఉన్నాయి?", "kn-IN", "te"),  # Telugu word (seen in testing)
-    ("ಯಾವ area? Okay.", "kn-IN", None),
+    ("ಈ ಗುಂಡಿಗಳು ಯಾವಾಗ부터 ಇವೆ?", "kn-IN", "HANGUL"),  # Korean word on a real call, 16 Oct
+    ("这是什么", "kn-IN", "CJK"),
+    ("ಯಾವ area? Okay. ₹500, 5 ವರ್ಷ – ಸರಿ!", "kn-IN", None),
+    ("நீங்கள் எங்கே?", "ta-IN", None),  # a Tamil caller may hear Tamil
     ("कौन सा area?", "hi-IN", None),
 ])
 def test_wrong_script_is_detected(text, lang, expected):

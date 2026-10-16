@@ -17,6 +17,8 @@ WEB_DIST = Path(__file__).resolve().parents[2] / "web" / "dist"
 
 app = FastAPI(title="Citizen's Voice", version=get_settings().app_version)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+# httpx logs every request URL at INFO; keep it quiet so no URL (or anything in one) reaches the logs.
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 @app.on_event("startup")

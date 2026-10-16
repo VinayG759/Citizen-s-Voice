@@ -86,6 +86,27 @@ def km_between(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * r * math.asin(math.sqrt(a))
 
 
+# Endings shared by hundreds of Karnataka place names. "Dasahalli" and "Chowdanahalli" look
+# 73% alike only because of "-halli"; what tells them apart is the part before it.
+_SUFFIXES = ("halli", "hally", "palya", "palaya", "pura", "puram", "nagar", "nagara", "layout",
+             "kunte", "kere", "doddi", "ಹಳ್ಳಿ", "ಪಾಳ್ಯ", "ಪುರ", "ನಗರ", "ಕುಂಟೆ", "ಕೆರೆ")
+
+
+def _stem(text: str) -> tuple[str, bool]:
+    """'dasa halli' -> ('dasa', True). Only strips an ending if a real stem remains."""
+    t = text.replace(" ", "")
+    for suf in _SUFFIXES:
+        if t.endswith(suf) and len(t) - len(suf) >= 3:
+            return t[: -len(suf)], True
+    return t, False
+
+
+_GENERIC = {"railway", "station", "bus", "stand", "stop", "hospital", "clinic", "school", "college",
+            "temple", "church", "mosque", "park", "market", "circle", "junction", "layout", "colony",
+            "flyover", "bridge", "lake", "tank", "post", "office", "police", "government", "govt",
+            "primary", "high", "new", "old", "town", "main", "cross", "road", "nagar", "extension"}
+
+
 # Words that say what KIND of place the caller means: matching kinds get a boost.
 _KIND_WORDS = {
     "station": ("station",), "railway": ("station",), "ನಿಲ್ದಾಣ": ("station", "bus_station"),
@@ -118,12 +139,24 @@ def _score(query: str, place: Place) -> float:
         s = max(fuzz.token_sort_ratio(q, n), fuzz.ratio(q.replace(" ", ""), n.replace(" ", "")))
         # A name found inside a longer query ("rajanukunte" in "rajanukunte railway
         # station") counts in proportion to how much of the query it explains.
-        if len(n) >= 6:
-            coverage = min(1.0, len(n) / len(q))
+        # One way only: the place name inside the caller's words, never the reverse
+        # ("mary school" must not match inside "primary school").
+        if 6 <= len(n) < len(q):
+            coverage = len(n) / len(q)
             s = max(s, fuzz.partial_ratio(n, q) * (0.6 + 0.4 * coverage))
-        # Names shared by many places ("Hospital", "Railway Station") pin down nothing.
-        if _name_counts().get(n, 0) > 2:
-            s -= 12
+        # The caller said a "-halli" (or similar) name? Then the name must contain a word
+        # with the same kind of ending whose part before it matches too.
+        q_stem, q_has = _stem(q)
+        if q_has:
+            stems = [st for st, has in (_stem(w) for w in n.split()) if has]
+            whole_stem, whole_has = _stem(n)
+            if whole_has:
+                stems.append(whole_stem)
+            s = min(s, max((fuzz.ratio(q_stem, st) for st in stems), default=0) + 15)
+        # Names made only of generic words ("Hospital", "Railway Station") pin down nothing,
+        # even when the caller said exactly that; a real name ("Yelahanka New Town") is fine.
+        if set(n.split()) <= _GENERIC and _name_counts().get(n, 0) > 1:
+            s -= 15
         best = max(best, s)
     return best
 
@@ -141,27 +174,46 @@ def find(query: str, area: str | None = None, limit: int = 3) -> list[Match]:
     """Best matches for `query`; if `area` is given, places near that area rank higher."""
     places = load()
     centre = None
+    # Gemma sometimes passes the place itself as the area ("Dasahalli" near "Dasahalli"):
+    # that would boost whatever matched first, right or wrong. Only a different area counts.
+    if area and fuzz.ratio(normalise(area), normalise(query)) >= 85:
+        area = None
     if area:
         area_hits = sorted(places, key=lambda p: _score(area, p), reverse=True)[:1]
         if area_hits and _score(area, area_hits[0]) >= 75:
             centre = area_hits[0]
 
     kinds = _wanted_kinds(query)
-    scored: list[Match] = []
+    # "The railway station" / "the hospital" + an area: the caller means the nearest one of that
+    # kind in that area, not some place literally named "Railway Station".
+    if centre is not None and kinds and set(normalise(query).split()) <= _GENERIC:
+        near = sorted(
+            (Match(p, 90.0, km_between(centre.lat, centre.lon, p.lat, p.lon)) for p in places if p.kind in kinds),
+            key=lambda m: m.distance_km_from_area,
+        )
+        near = [m for m in near if m.distance_km_from_area <= NEAR_KM][:limit]
+        if near:
+            return near
+
+    scored: list[tuple[float, Match]] = []
     for p in places:
         s = _score(query, p)
-        if s < MIN_SCORE - 10:
+        if s < MIN_SCORE:  # bonuses below only help names that already match well
             continue
         dist = km_between(centre.lat, centre.lon, p.lat, p.lon) if centre else None
         if dist is not None:
-            s += 10 if dist <= NEAR_KM else -10
+            if dist <= NEAR_KM:
+                s += 10
+            elif s < 95:  # a name the caller said exactly isn't ruled out by distance
+                s -= 10
         if kinds and p.kind in kinds:
             s += 8
         if p.kind == "road":
             s -= 3  # prefer a landmark over a long road with the same name
-        scored.append(Match(p, min(s, 100.0), dist))
+        scored.append((s, Match(p, min(s, 100.0), dist)))
 
-    scored.sort(key=lambda m: m.score, reverse=True)
+    # Rank on the uncapped score, so two "100"s still come out in the right order.
+    scored = [m for _, m in sorted(scored, key=lambda x: x[0], reverse=True)]
     out: list[Match] = []
     seen: set[str] = set()
     for m in scored:

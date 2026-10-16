@@ -71,7 +71,8 @@ def generate(
         ]}]
     t0 = time.perf_counter()
     try:
-        r = httpx.post(URL.format(model=model), params={"key": api_key}, json=body, timeout=timeout_s)
+        # Key in a header, never in the URL: URLs end up in logs.
+        r = httpx.post(URL.format(model=model), headers={"x-goog-api-key": api_key}, json=body, timeout=timeout_s)
     except httpx.HTTPError as e:
         raise LLMError(f"gemini {type(e).__name__}") from e
     ms = int((time.perf_counter() - t0) * 1000)

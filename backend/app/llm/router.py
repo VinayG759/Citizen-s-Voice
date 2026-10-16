@@ -6,6 +6,7 @@ answers in the wrong script.
 """
 
 import logging
+import unicodedata
 from typing import Literal
 
 from app.llm import gemini, openrouter
@@ -14,27 +15,30 @@ from app.settings import get_settings
 
 log = logging.getLogger(__name__)
 
-# Unicode blocks for scripts Gemma sometimes slips into. Kannada (0C80–0CFF),
-# Devanagari (0900–097F) and Latin are what our callers use.
-_SCRIPTS = {
-    "ta": (0x0B80, 0x0BFF),  # Tamil
-    "te": (0x0C00, 0x0C7F),  # Telugu
-    "ml": (0x0D00, 0x0D7F),  # Malayalam
-    "bn": (0x0980, 0x09FF),  # Bengali / Assamese
-    "gu": (0x0A80, 0x0AFF),  # Gujarati
-    "pa": (0x0A00, 0x0A7F),  # Gurmukhi
-    "or": (0x0B00, 0x0B7F),  # Odia
-}
+# Scripts our callers use: Kannada, Devanagari (Hindi) and Latin letters. A letter from any
+# other script is a slip (seen in testing: Tamil, Telugu, and on a real call a Korean word).
+_ALLOWED = ((0x0C80, 0x0CFF), (0x0900, 0x097F))
+# If a caller speaks one of these languages, its script is allowed too.
+_EXTRA = {"ta": (0x0B80, 0x0BFF), "te": (0x0C00, 0x0C7F), "ml": (0x0D00, 0x0D7F), "bn": (0x0980, 0x09FF),
+          "gu": (0x0A80, 0x0AFF), "pa": (0x0A00, 0x0A7F), "or": (0x0B00, 0x0B7F)}
 
 
 def foreign_script(text: str, caller_language: str | None = None) -> str | None:
-    """The first script in `text` that the caller isn't using, e.g. "ta". None if clean."""
-    allowed = (caller_language or "").split("-")[0]
+    """The first letter's script that doesn't belong in this reply (e.g. "ta", "HANGUL"). None if clean."""
+    allowed = list(_ALLOWED)
+    extra = _EXTRA.get((caller_language or "").split("-")[0])
+    if extra:
+        allowed.append(extra)
     for ch in text:
         cp = ord(ch)
-        for code, (lo, hi) in _SCRIPTS.items():
-            if lo <= cp <= hi and code != allowed:
+        if cp < 0x250 or not ch.isalpha():  # Latin letters, digits, punctuation, symbols
+            continue
+        if any(lo <= cp <= hi for lo, hi in allowed):
+            continue
+        for code, (lo, hi) in _EXTRA.items():
+            if lo <= cp <= hi:
                 return code
+        return unicodedata.name(ch, "UNKNOWN").split()[0]
     return None
 
 

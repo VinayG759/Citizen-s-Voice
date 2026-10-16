@@ -31,7 +31,9 @@ class Settings(BaseSettings):
     llm_live_model: str = "gemma-4-26b-a4b-it"  # a caller is waiting: lightweight, thinking off
     llm_background_model: str = "gemma-4-31b-it"  # nobody waiting: bigger, thinking on
     # After this long, a live turn gives up on Google and asks OpenRouter instead.
-    llm_primary_timeout_s: float = 4.0
+    # Google's normal live reply takes ~2 s; slower than this is handed to OpenRouter (real call, 16 Oct:
+    # waiting 4 s for a timeout cost the caller 4 s of silence).
+    llm_primary_timeout_s: float = 2.5
 
     # Sarvam — speech to text and text to speech.
     sarvam_api_key: str = ""
