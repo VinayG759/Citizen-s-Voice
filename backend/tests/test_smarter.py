@@ -1,0 +1,94 @@
+"""Phase 5: duplicate reports and 'what happened to my complaint?' — with a fake database."""
+
+from datetime import datetime
+
+from app.clerk import clerk as clerk_mod
+from app.clerk.clerk import Conversation
+from app.db.repo import ComplaintStatus, FiledComplaint
+from app.llm.types import LLMReply, ToolCall
+from app.tools import clerk_tools
+
+PRESIDENCY = "osm-w780259661"
+
+
+class Repo:
+    """One open pothole complaint (CV-1042, 3 reports so far) near Presidency University."""
+
+    def __init__(self):
+        self.added, self.filed = [], []
+
+    def nearby_open(self, lat, lon, category, radius_m=150):
+        if category != "road":
+            return []
+        return [{"tracking_id": "CV-1042", "tracking_number": 1042, "summary": "Potholes near the gate",
+                 "place": "Presidency University", "report_count": 3, "metres_away": 40, "filed_on": "2026-10-15"}]
+
+    def add_report(self, parent, **fields):
+        self.added.append((parent, fields))
+        return FiledComplaint(42, parent), 4, False
+
+    def file_complaint(self, **fields):
+        self.filed.append(fields)
+        return FiledComplaint(1, 1001)
+
+    def latest_for_caller(self, caller_hash):
+        if caller_hash == "mine":
+            return ComplaintStatus("CV-1004", "in_progress", "road", "Potholes", "St. Mary's School",
+                                   datetime(2026, 10, 16))
+        return None
+
+    def complaint_status(self, n):
+        return None
+
+
+def ready_state():
+    s = clerk_tools.ToolState()
+    clerk_tools.find_place(s, "Presidency University")
+    s.caller_turn = 2
+    return s
+
+
+def test_nearby_finds_the_existing_complaint_without_exposing_internal_ids():
+    s, repo = ready_state(), Repo()
+    out = clerk_tools.find_nearby_complaints(s, repo, PRESIDENCY, "road")
+    assert out["matches"][0]["tracking_id"] == "CV-1042" and "tracking_number" not in out["matches"][0]
+    assert clerk_tools.find_nearby_complaints(s, repo, PRESIDENCY, "water")["matches"] == []
+
+
+def test_same_problem_is_added_to_the_original_with_one_tracking_id():
+    s, repo = ready_state(), Repo()
+    clerk_tools.find_nearby_complaints(s, repo, PRESIDENCY, "road")
+    out = clerk_tools.file_complaint(s, repo, {}, category="road", summary_en="Potholes", place_id=PRESIDENCY,
+                                     caller_confirmed=True, same_as="cv-1042")
+    assert out["tracking_id"] == "CV-1042" and out["you_are_reporter_number"] == 4
+    assert repo.added[0][0] == 1042 and repo.filed == []  # linked report, no second complaint
+
+
+def test_linking_to_a_complaint_the_lookup_never_returned_is_refused():
+    s, repo = ready_state(), Repo()
+    out = clerk_tools.file_complaint(s, repo, {}, category="road", summary_en="Potholes", place_id=PRESIDENCY,
+                                     caller_confirmed=True, same_as="CV-9999")
+    assert out["not_filed"] and repo.added == [] and repo.filed == []
+
+
+def test_status_without_a_number_finds_only_the_callers_own_complaint():
+    repo = Repo()
+    assert clerk_tools.get_complaint_status(repo, None, "mine", "phone")["tracking_id"] == "CV-1004"
+    assert clerk_tools.get_complaint_status(repo, None, "someone-else", "phone")["found"] is False
+    # on the web there is no phone number to recognise, so a tracking number is required
+    assert clerk_tools.get_complaint_status(repo, None, "mine", "web")["found"] is False
+
+
+def test_the_caller_hears_they_are_the_fourth_reporter(monkeypatch):
+    repo = Repo()
+    conv = Conversation(call_id=1, repo=repo, language="en-IN")
+    clerk_tools.find_place(conv.state, "Presidency University")
+    clerk_tools.find_nearby_complaints(conv.state, repo, PRESIDENCY, "road")
+    conv.state.caller_turn = 1
+    replies = iter([LLMReply("", [ToolCall("t1", "file_complaint", dict(
+        category="road", summary_en="Potholes", place_id=PRESIDENCY, caller_confirmed=True, same_as="CV-1042"))],
+        "fake", "fake", 5)])
+    monkeypatch.setattr(clerk_mod.router, "generate", lambda **_: next(replies))
+    result = conv.turn("Yes, that's right")
+    assert "person number 4" in result.reply and "C V 1 0 4 2" in result.reply
+    assert result.complaint == {"tracking_id": "CV-1042"}

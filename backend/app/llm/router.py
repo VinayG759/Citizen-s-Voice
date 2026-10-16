@@ -63,28 +63,38 @@ def generate(
 
     errors = []
     for provider, model in attempts:
-        # Each provider gets one retry if it replies in the wrong script.
+        # A reply in the wrong script gets one retry: with the bigger model (whose Kannada was clean in
+        # every test) and a one-line reminder. Retrying the same small model the same way tends to
+        # slip again (golden run, 16 Oct: Telugu twice in a row).
+        sys_prompt, use_model = system, model
         for _ in range(2):
             try:
-                if provider == "gemini":
-                    reply = gemini.generate(
-                        api_key=s.gemini_api_key, model=model, system=system, messages=messages, tools=tools,
-                        thinking="minimal" if live else "high", max_tokens=max_tokens if live else max_tokens * 4,
-                        timeout_s=s.llm_primary_timeout_s if live else 60,
-                    )
-                else:
-                    reply = openrouter.generate(
-                        api_key=s.openrouter_api_key, model=model, system=system, messages=messages, tools=tools,
-                        max_tokens=max_tokens, timeout_s=10 if live else 60,
-                    )
+                reply = _call(provider, use_model, sys_prompt, messages, tools, live, max_tokens)
             except LLMError as e:
                 errors.append(str(e))
-                log.warning("LLM %s/%s failed: %s", provider, model, e)
+                log.warning("LLM %s/%s failed: %s", provider, use_model, e)
                 break  # next provider
             bad = foreign_script(reply.text, caller_language)
-            if bad:
-                errors.append(f"{provider} replied with {bad} script")
-                log.warning("LLM %s replied with %s script; retrying", provider, bad)
-                continue
-            return reply
+            if not bad:
+                return reply
+            errors.append(f"{provider}/{use_model} replied with {bad} script")
+            log.warning("LLM %s/%s replied with %s script; retrying with the bigger model", provider, use_model, bad)
+            use_model = s.llm_background_model if provider == "gemini" else "google/" + s.llm_background_model
+            sys_prompt = (system + f"\n\nIMPORTANT: your last reply contained {bad} script. Use only Kannada "
+                          "script, Devanagari or English letters.")
     raise LLMError("; ".join(errors) or "all providers failed")
+
+
+def _call(provider: str, model: str, system: str, messages: list[Msg], tools: list[ToolSpec],
+          live: bool, max_tokens: int) -> LLMReply:
+    s = get_settings()
+    if provider == "gemini":
+        return gemini.generate(
+            api_key=s.gemini_api_key, model=model, system=system, messages=messages, tools=tools,
+            thinking="minimal" if live else "high", max_tokens=max_tokens if live else max_tokens * 4,
+            timeout_s=s.llm_primary_timeout_s if live else 60,
+        )
+    return openrouter.generate(
+        api_key=s.openrouter_api_key, model=model, system=system, messages=messages, tools=tools,
+        max_tokens=max_tokens, timeout_s=10 if live else 60,
+    )

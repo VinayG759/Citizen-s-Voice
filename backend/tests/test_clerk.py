@@ -167,3 +167,19 @@ def test_after_filing_the_tracking_id_is_read_out_without_another_model_call(mon
     ])
     result = conv.turn("ಹೌದು")
     assert "C V 1 0 0 1" in result.reply and result.complaint == {"tracking_id": "CV-1001"}
+
+
+def test_a_wrong_script_reply_is_retried_with_the_bigger_model_and_a_reminder(monkeypatch):
+    from app.llm import router
+    calls = []
+
+    def fake_openrouter(**kw):
+        calls.append((kw["model"], "IMPORTANT" in kw["system"]))
+        text = "ಯಾವ area ಅಲ್ಲಿ ఉన్నాయి?" if len(calls) == 1 else "ಯಾವ area ಅಲ್ಲಿ ಇದೆ?"
+        return LLMReply(text, [], "openrouter", kw["model"], 5)
+
+    monkeypatch.setattr(router.get_settings(), "gemini_api_key", "")
+    monkeypatch.setattr(router.openrouter, "generate", fake_openrouter)
+    reply = router.generate(system="clerk", messages=[], tools=[], caller_language="kn-IN")
+    assert reply.text == "ಯಾವ area ಅಲ್ಲಿ ಇದೆ?"
+    assert calls == [("google/gemma-4-26b-a4b-it", False), ("google/gemma-4-31b-it", True)]

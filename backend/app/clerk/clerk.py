@@ -30,6 +30,15 @@ FILED = {
     "hi": "आपकी complaint register हो गई है। Tracking ID {sid}. फिर से: {sid}. धन्यवाद।",
     "en": "Your complaint is registered. Tracking ID {sid}. Once more: {sid}. Thank you.",
 }
+# Said when the caller's report was added to a problem others already reported.
+ADDED = {
+    "kn": "ಈ problem ಅನ್ನು ಈಗಾಗಲೇ report ಮಾಡಲಾಗಿದೆ. ನೀವು {n}ನೇ ವ್ಯಕ್ತಿ.{raised} Tracking ID {sid}. ಮತ್ತೊಮ್ಮೆ: {sid}. ಧನ್ಯವಾದಗಳು.",
+    "hi": "यह problem पहले से report हो चुकी है। आप {n}वें व्यक्ति हैं।{raised} Tracking ID {sid}. फिर से: {sid}. धन्यवाद।",
+    "en": "This problem was already reported. You are person number {n} to report it.{raised} Tracking ID {sid}. "
+          "Once more: {sid}. Thank you.",
+}
+RAISED = {"kn": " ಇದರ priority ಹೆಚ್ಚಿಸಲಾಗಿದೆ.", "hi": " इसकी priority बढ़ा दी गई है।",
+          "en": " Its priority has been raised."}
 GOODBYE = {
     "kn": "ಈ call ತುಂಬಾ ಉದ್ದ ಆಯ್ತು. ದಯವಿಟ್ಟು ಮತ್ತೆ call ಮಾಡಿ. ಧನ್ಯವಾದಗಳು.",
     "hi": "यह call बहुत लंबी हो गई। कृपया फिर से call करें। धन्यवाद।",
@@ -57,6 +66,7 @@ class Conversation:
     language: str = "kn-IN"
     messages: list[Msg] = field(default_factory=list)
     state: tools.ToolState = field(default_factory=tools.ToolState)
+    _raised: bool = False
 
     def turn(self, caller_text: str, language: str | None = None) -> TurnResult:
         """One caller turn; the dashboard hears about it as it finishes."""
@@ -114,12 +124,18 @@ class Conversation:
             for call in reply.tool_calls:
                 events.append(_event("tool_call", tool=call.name, args=call.args, provider=reply.provider, ms=reply.ms))
                 result = self._run_tool(call.name, call.args)
+                if call.name == "file_complaint" and result.get("added_to_existing"):
+                    self._raised = bool(result.get("priority_raised"))
                 events.append(_event("tool_result", tool=call.name, result=result))
                 self.messages.append(Msg("tool", tool_call_id=call.id, tool_name=call.name, tool_result=result))
 
             if filed_before is None and self.state.filed is not None:
                 sid = tools.spoken_id(self.state.filed.tracking_number)
-                text = FILED.get(lang, FILED["en"]).format(sid=sid)
+                if self.state.report_count:
+                    raised = RAISED.get(lang, RAISED["en"]) if self._raised else ""
+                    text = ADDED.get(lang, ADDED["en"]).format(sid=sid, n=self.state.report_count, raised=raised)
+                else:
+                    text = FILED.get(lang, FILED["en"]).format(sid=sid)
                 self.messages.append(Msg("model", text))
                 events.append(_event("decision", text="filed; confirmed the tracking ID to the caller"))
                 return TurnResult(text, self.language, events, llm_ms,
@@ -138,7 +154,10 @@ class Conversation:
                         "caller_last4": self.caller_last4, "channel": self.channel}
                 out = tools.file_complaint(self.state, self.repo, info, **args)
             elif name == "get_complaint_status":
-                out = tools.get_complaint_status(self.repo, str(args.get("tracking_id", "")))
+                out = tools.get_complaint_status(self.repo, args.get("tracking_id"), self.caller_hash, self.channel)
+            elif name == "find_nearby_complaints":
+                out = tools.find_nearby_complaints(self.state, self.repo, str(args.get("place_id", "")),
+                                                   str(args.get("category", "")))
             elif name == "raise_emergency":
                 out = tools.raise_emergency(self.state, str(args.get("reason", "")))
             else:

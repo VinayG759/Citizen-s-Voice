@@ -24,6 +24,23 @@ class FakeRepo:
         self.filed.append(fields)
         return FiledComplaint(len(self.filed), 1000 + len(self.filed))
 
+    def nearby_open(self, lat, lon, category, radius_m=150):
+        # One existing pothole complaint at Yelahanka New Town bus station.
+        if category == "road" and abs(lat - 13.0957) < 0.005 and abs(lon - 77.5790) < 0.005:
+            return [{"tracking_id": "CV-1042", "tracking_number": 1042, "summary": "Big potholes outside the bus station",
+                     "place": "Yelahanka New Town", "report_count": 2, "metres_away": 30, "filed_on": "2026-10-15"}]
+        return []
+
+    def add_report(self, parent, **fields):
+        self.filed.append({**fields, "same_as": parent})
+        return FiledComplaint(42, parent), 3, True
+
+    def latest_for_caller(self, caller_hash):
+        if caller_hash == "known-caller":
+            return ComplaintStatus("CV-1004", "in_progress", "road", "Potholes in front of St. Mary's School",
+                                   "St. Mary's School", datetime(2026, 10, 16))
+        return None
+
     def complaint_status(self, n):
         if n == 1042:
             return ComplaintStatus("CV-1042", "in_progress", "road", "Potholes near Presidency University",
@@ -40,6 +57,9 @@ class Case:
     place_contains: str | None = None
     expect_tool: str | None = None  # a tool that must be called (emergency, status)
     must_not_file: bool = False
+    same_as: int | None = None  # expect the report to be added to this existing complaint
+    channel: str = "web"
+    caller_hash: str | None = None
     transcript: list[str] = field(default_factory=list)
 
 
@@ -87,12 +107,20 @@ CASES = [
          ["Big potholes on the road near Presidency University.", "No, not the university. It's near Jakkur Lake.",
           "For a month.", "Yes, Jakkur Lake is right."],
          category="road", place_contains="Jakkur"),
+    Case("Already reported: adds to the original", "en-IN",
+         ["There are big potholes on the road at Yelahanka New Town bus station.", "Yes, that's the one.",
+          "About a week.", "Yes, correct."],
+         category="road", place_contains="Yelahanka New Town", expect_tool="find_nearby_complaints", same_as=1042),
+    Case("Status of my complaint, no number (phone)", "kn-IN",
+         ["ನನ್ನ complaint ಏನಾಯ್ತು? Number ನೆನಪಿಲ್ಲ."],
+         expect_tool="get_complaint_status", must_not_file=True, channel="phone", caller_hash="known-caller"),
 ]
 
 
 def run(case: Case) -> tuple[bool, str, float]:
     repo = FakeRepo()
-    conv = Conversation(call_id=0, repo=repo, language=case.language)
+    conv = Conversation(call_id=0, repo=repo, language=case.language, channel=case.channel,
+                        caller_hash=case.caller_hash)
     tools_used: set[str] = set()
     t0 = time.perf_counter()
     for line in case.caller:
@@ -113,6 +141,11 @@ def run(case: Case) -> tuple[bool, str, float]:
         problems.append(f"category {filed['category']} ≠ {case.category}")
     if filed and case.place_contains and case.place_contains.lower() not in (filed["place_name"] or "").lower():
         problems.append(f"place {filed['place_name']!r} lacks {case.place_contains!r}")
+    if case.same_as and (not filed or filed.get("same_as") != case.same_as):
+        problems.append(f"not added to CV-{case.same_as}")
+    said = " ".join(case.transcript)
+    if case.caller_hash and not any(x in said for x in ("1004", "1 0 0 4")):
+        problems.append("did not tell the caller about CV-1004")
     if case.expect_tool and case.expect_tool not in tools_used:
         problems.append(f"never called {case.expect_tool}")
     detail = "; ".join(problems) or (f"filed {filed['category']} @ {filed['place_name']}" if filed else "ok")

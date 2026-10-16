@@ -30,6 +30,8 @@ class ToolState:
     offered: dict[str, OfferedPlace] = field(default_factory=dict)
     filed: object | None = None  # FiledComplaint once filed
     emergency_reason: str | None = None
+    nearby_seen: dict[str, int] = field(default_factory=dict)  # tracking_id → number, from find_nearby_complaints
+    report_count: int | None = None  # set when this call was added to an existing complaint
 
 
 SPECS = [
@@ -54,14 +56,26 @@ SPECS = [
             "since_when": {"type": "string", "description": "how long the problem has existed, if the caller said"},
             "urgency": {"type": "integer", "description": "1 (minor) to 5 (danger to life)"},
             "caller_confirmed": {"type": "boolean", "description": "true only if the caller said the read-back is right"},
+            "same_as": {"type": "string", "description": "tracking ID from find_nearby_complaints if this is the SAME "
+                                                         "problem already reported; leave out for a new problem"},
         }, "required": ["category", "summary_en", "place_id", "caller_confirmed"]},
     ),
     ToolSpec(
-        "get_complaint_status",
-        "Look up a complaint by its tracking number, when the caller asks what happened to a complaint.",
+        "find_nearby_complaints",
+        "After the place is found and before the read-back: check whether this problem was already reported "
+        "within about 150 m. Returns open complaints of the same category nearby.",
         {"type": "object", "properties": {
-            "tracking_id": {"type": "string", "description": "e.g. 'CV-1042' or '1042'"},
-        }, "required": ["tracking_id"]},
+            "place_id": {"type": "string", "description": "id of the place from find_place"},
+            "category": {"type": "string", "enum": list(CATEGORIES)},
+        }, "required": ["place_id", "category"]},
+    ),
+    ToolSpec(
+        "get_complaint_status",
+        "Look up a complaint when the caller asks what happened to it. Give the tracking number if they know it; "
+        "leave it out to look up this caller's own latest complaint (phone calls only).",
+        {"type": "object", "properties": {
+            "tracking_id": {"type": "string", "description": "e.g. 'CV-1042' or '1042', if the caller said it"},
+        }},
     ),
     ToolSpec(
         "raise_emergency",
@@ -111,11 +125,16 @@ def file_complaint(state: ToolState, repo, session_info: dict, **a) -> dict:
     if problems:
         return {"ok": False, "not_filed": True, "fix": problems}
 
+    same_as = (a.get("same_as") or "").strip().upper()
+    if same_as and same_as not in state.nearby_seen:
+        return {"ok": False, "not_filed": True,
+                "fix": ["same_as must be a tracking ID returned by find_nearby_complaints in this conversation"]}
+
     p = offered.place
     urgency = a.get("urgency") if isinstance(a.get("urgency"), int) else 3
     if state.emergency_reason:
         urgency = 5
-    filed = repo.file_complaint(
+    fields = dict(
         category=a["category"],
         summary_en=a["summary_en"].strip()[:500],
         summary_local=(a.get("summary_local") or "").strip()[:500] or None,
@@ -132,18 +151,49 @@ def file_complaint(state: ToolState, repo, session_info: dict, **a) -> dict:
         caller_last4=session_info.get("caller_last4"),
         channel=session_info.get("channel", "web"),
     )
+    if same_as:
+        # Same problem: one tracking ID for everyone; the original gets this report counted.
+        filed, count, raised = repo.add_report(state.nearby_seen[same_as], **fields)
+        state.filed, state.report_count = filed, count
+        return {"ok": True, "added_to_existing": True, "tracking_id": filed.tracking_id,
+                "say_tracking_id_as": spoken_id(filed.tracking_number), "you_are_reporter_number": count,
+                "priority_raised": raised, "place": p.label}
+    filed = repo.file_complaint(**fields)
     state.filed = filed
     return {"ok": True, "tracking_id": filed.tracking_id, "say_tracking_id_as": spoken_id(filed.tracking_number),
             "place": p.label}
 
 
-def get_complaint_status(repo, tracking_id: str) -> dict:
+def find_nearby_complaints(state: ToolState, repo, place_id: str, category: str) -> dict:
+    offered = state.offered.get(place_id or "")
+    if offered is None:
+        return {"error": "place_id must come from find_place"}
+    if category not in CATEGORIES:
+        return {"error": f"category must be one of {list(CATEGORIES)}"}
+    found = repo.nearby_open(offered.place.lat, offered.place.lon, category)[:3]
+    for f in found:
+        state.nearby_seen[f["tracking_id"]] = f["tracking_number"]
+    if not found:
+        return {"matches": [], "note": "Nothing similar reported nearby: this is a new complaint."}
+    return {"matches": [{k: v for k, v in f.items() if k != "tracking_number"} for f in found],
+            "note": "If one of these is clearly the SAME problem, tell the caller it is already reported "
+                    "(by how many people) and that their report will be added; then read back and file with "
+                    "same_as. If unsure, ask the caller one short question. Otherwise file as new."}
+
+
+def get_complaint_status(repo, tracking_id: str | None, caller_hash: str | None = None, channel: str = "web") -> dict:
     digits = re.sub(r"\D", "", tracking_id or "")
-    if not digits:
+    if digits:
+        st = repo.complaint_status(int(digits))
+        if not st:
+            return {"found": False, "note": "No complaint with that number. Ask the caller to repeat it."}
+    elif channel == "phone" and caller_hash:
+        # Only the caller's OWN complaints, recognised by their (hashed) number.
+        st = repo.latest_for_caller(caller_hash)
+        if not st:
+            return {"found": False, "note": "No complaint from this phone number. Ask for the tracking number."}
+    else:
         return {"found": False, "note": "Ask for the tracking number, e.g. C V 1 0 4 2."}
-    st = repo.complaint_status(int(digits))
-    if not st:
-        return {"found": False, "note": "No complaint with that number. Ask the caller to repeat it."}
     return {"found": True, "tracking_id": st.tracking_id, "status": st.status, "category": st.category,
             "summary": st.summary_en, "place": st.place_name, "filed_on": st.created_at.date().isoformat()}
 
