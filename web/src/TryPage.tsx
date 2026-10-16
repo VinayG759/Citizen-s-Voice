@@ -133,7 +133,11 @@ export function TryPage() {
 
   // Keep the newest line in view.
   const endRef = useRef<HTMLDivElement>(null);
-  useEffect(() => endRef.current?.scrollIntoView?.({ block: "nearest" }), [lines]);
+  // Braces matter: an effect's return value is called as its clean-up, and newer Chrome
+  // returns a Promise from scrollIntoView — returning it crashed the page on the next update.
+  useEffect(() => {
+    endRef.current?.scrollIntoView?.({ block: "nearest" });
+  }, [lines]);
 
   return (
     <div className="page">

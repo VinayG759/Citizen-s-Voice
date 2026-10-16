@@ -55,3 +55,17 @@ test("a refused filing is explained, not hidden", () => {
     describeStep({ kind: "tool_result", tool: "file_complaint", result: { ok: false, fix: ["the caller has not confirmed the read-back yet"] } }),
   ).toBe("Not filed yet: the caller has not confirmed the read-back yet");
 });
+
+test("survives browsers whose scrollIntoView returns a Promise (newer Chrome)", async () => {
+  Element.prototype.scrollIntoView = vi.fn(() => Promise.resolve()) as unknown as Element["scrollIntoView"];
+  mockServer({
+    caller_text: "hi", language: "en-IN", reply: "Which area?", events: [],
+    complaint: null, ended: false, timings: { stt_ms: 0, llm_ms: 1 },
+  });
+  render(<TryPage />);
+  fireEvent.click(screen.getByRole("button", { name: "Start talking" }));
+  fireEvent.change(await screen.findByLabelText("Or type your message"), { target: { value: "hi" } });
+  fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+  expect(await screen.findByText("Which area?")).toBeInTheDocument(); // the page did not go blank
+  delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+});
