@@ -25,3 +25,6 @@ Thumbs.db
 
 # build caches
 *.tsbuildinfo
+
+# OpenStreetMap download cache (rebuildable)
+.cache/

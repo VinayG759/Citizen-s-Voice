@@ -22,6 +22,8 @@ SORRY = {
     "kn": "ಕ್ಷಮಿಸಿ, ಒಂದು ಸಣ್ಣ technical problem. ದಯವಿಟ್ಟು ಮತ್ತೆ ಹೇಳ್ತೀರಾ?",
     "hi": "माफ़ कीजिए, एक छोटी technical problem है। क्या आप फिर से बताएंगे?",
     "en": "Sorry, a small technical problem. Could you say that again?",
+    "ta": "மன்னிக்கவும், ஒரு சிறிய technical problem. மீண்டும் சொல்ல முடியுமா?",
+    "te": "క్షమించండి, చిన్న technical problem. మళ్ళీ చెప్పగలరా?",
 }
 # Said right after a successful filing: fixed wording, so the tracking ID is always read
 # correctly and the caller doesn't wait for another model call.
@@ -29,6 +31,8 @@ FILED = {
     "kn": "ನಿಮ್ಮ complaint register ಆಗಿದೆ. Tracking ID {sid}. ಮತ್ತೊಮ್ಮೆ: {sid}. ಧನ್ಯವಾದಗಳು.",
     "hi": "आपकी complaint register हो गई है। Tracking ID {sid}. फिर से: {sid}. धन्यवाद।",
     "en": "Your complaint is registered. Tracking ID {sid}. Once more: {sid}. Thank you.",
+    "ta": "உங்கள் complaint பதிவு செய்யப்பட்டது. Tracking ID {sid}. மீண்டும்: {sid}. நன்றி.",
+    "te": "మీ complaint నమోదు అయింది. Tracking ID {sid}. మళ్ళీ: {sid}. ధన్యవాదాలు.",
 }
 # Said when the caller's report was added to a problem others already reported.
 ADDED = {
@@ -36,13 +40,19 @@ ADDED = {
     "hi": "यह problem पहले से report हो चुकी है। आप {n}वें व्यक्ति हैं।{raised} Tracking ID {sid}. फिर से: {sid}. धन्यवाद।",
     "en": "This problem was already reported. You are person number {n} to report it.{raised} Tracking ID {sid}. "
           "Once more: {sid}. Thank you.",
+    "ta": "இந்த problem ஏற்கனவே report செய்யப்பட்டுள்ளது. நீங்கள் {n}-வது நபர்.{raised} Tracking ID {sid}. "
+          "மீண்டும்: {sid}. நன்றி.",
+    "te": "ఈ problem ఇప్పటికే report అయింది. మీరు {n}వ వ్యక్తి.{raised} Tracking ID {sid}. మళ్ళీ: {sid}. ధన్యవాదాలు.",
 }
 RAISED = {"kn": " ಇದರ priority ಹೆಚ್ಚಿಸಲಾಗಿದೆ.", "hi": " इसकी priority बढ़ा दी गई है।",
-          "en": " Its priority has been raised."}
+          "en": " Its priority has been raised.", "ta": " இதன் priority உயர்த்தப்பட்டது.",
+          "te": " దీని priority పెంచబడింది."}
 GOODBYE = {
     "kn": "ಈ call ತುಂಬಾ ಉದ್ದ ಆಯ್ತು. ದಯವಿಟ್ಟು ಮತ್ತೆ call ಮಾಡಿ. ಧನ್ಯವಾದಗಳು.",
     "hi": "यह call बहुत लंबी हो गई। कृपया फिर से call करें। धन्यवाद।",
     "en": "This conversation has gone on long. Please call again. Thank you.",
+    "ta": "இந்த உரையாடல் நீண்டுவிட்டது. மீண்டும் call செய்யுங்கள். நன்றி.",
+    "te": "ఈ సంభాషణ చాలా సేపు అయింది. దయచేసి మళ్ళీ call చేయండి. ధన్యవాదాలు.",
 }
 
 
@@ -78,7 +88,9 @@ class Conversation:
 
     def _turn(self, caller_text: str, language: str | None = None) -> TurnResult:
         if language:
-            self.language = language
+            # Sarvam can hear Urdu but not speak it; spoken Hindi and Urdu are mutually
+            # understood, so an Urdu caller is answered in spoken Hindi.
+            self.language = "hi-IN" if language.startswith("ur") else language
         lang = self.language.split("-")[0]
         self.state.caller_turn += 1
         start = len(self.messages)
@@ -148,7 +160,7 @@ class Conversation:
         t0 = time.perf_counter()
         try:
             if name == "find_place":
-                out = tools.find_place(self.state, str(args.get("query", "")), args.get("area"))
+                out = tools.find_place(self.state, str(args.get("query", "")), args.get("area"), args.get("road"))
             elif name == "file_complaint":
                 info = {"language": self.language, "caller_hash": self.caller_hash,
                         "caller_last4": self.caller_last4, "channel": self.channel}
