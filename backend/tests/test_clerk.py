@@ -212,3 +212,24 @@ def test_naming_a_language_chooses_it():
 def test_urdu_callers_are_answered_in_hindi():
     from app.clerk.language import LanguageLock
     assert LanguageLock().update("ur-IN", "پانی نہیں آ رہا") == "hi-IN"
+
+
+def test_one_turn_in_another_language_asks_before_switching():
+    from app.clerk.language import LanguageLock
+    lock = LanguageLock()
+    lock.update("kn-IN", "ನಮ್ಮ road ಅಲ್ಲಿ ಹಳ್ಳಗಳು ಇವೆ")
+    lock.update("en-IN", "Actually the potholes are near the bus stop")  # just speaks English
+    assert lock.language == "kn-IN" and lock.pending == "en-IN"  # not switched yet: Gemma asks
+    lock.update("en-IN", "Yes please")
+    assert lock.language == "en-IN" and lock.pending is None
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("ಸರಿ, gate ಹತ್ತಿರ… ಎಷ್ಟು ದಿನದಿಂದ?", "kn-IN"),
+    ("अच्छा, 3-4 दिन… कहाँ पर?", "hi-IN"),
+    ("Okay, two weeks. Which street?", "en-IN"),
+    ("", "kn-IN"),
+])
+def test_each_reply_is_voiced_in_the_language_it_is_written_in(text, expected):
+    from app.clerk.language import written_in
+    assert written_in(text, "kn-IN") == expected

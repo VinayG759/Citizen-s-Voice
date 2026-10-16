@@ -61,6 +61,8 @@ class Case:
     same_as: int | None = None  # expect the report to be added to this existing complaint
     channel: str = "web"
     caller_hash: str | None = None
+    final_language: str | None = None  # the language the clerk should end up speaking
+    expect_landmark_question: bool = False
     transcript: list[str] = field(default_factory=list)
 
 
@@ -123,6 +125,14 @@ CASES = [
     Case("Urdu water, answered in Hindi", "ur-IN",
          ["السلام علیکم، ہمارے علاقے میں دو دن سے پانی نہیں آ رہا۔", "Jakkur lake کے پاس۔", "دو دن سے۔", "جی ہاں، صحیح ہے۔"],
          category="water", place_contains="Jakkur"),
+    Case("Switches from Kannada to English halfway", "kn-IN",
+         [("ನಮಸ್ಕಾರ, ನಮ್ಮ area ಅಲ್ಲಿ streetlight ಕೆಲಸ ಮಾಡ್ತಿಲ್ಲ.", "kn-IN"),
+          ("Actually it is near Jakkur Lake, on the main road.", "en-IN"),
+          ("Yes, English is fine. It has been one week.", "en-IN"), ("Yes, correct.", "en-IN")],
+         category="streetlight", place_contains="Jakkur", final_language="en-IN"),
+    Case("Area only: asks once for a street or landmark", "hi-IN",
+         ["मेरे इलाके जयनगर में तीन दिन से पानी नहीं आ रहा है।", "चौथा block, 11th main road के पास।", "हाँ, सही है।"],
+         category="water", place_contains="Jayanagar", expect_landmark_question=True),
     Case("Status of my complaint, no number (phone)", "kn-IN",
          ["ನನ್ನ complaint ಏನಾಯ್ತು? Number ನೆನಪಿಲ್ಲ."],
          expect_tool="get_complaint_status", must_not_file=True, channel="phone", caller_hash="known-caller"),
@@ -135,8 +145,11 @@ def run(case: Case) -> tuple[bool, str, float]:
                         caller_hash=case.caller_hash)
     tools_used: set[str] = set()
     t0 = time.perf_counter()
+    replies = []
     for line in case.caller:
-        result = conv.turn(line, case.language)
+        line, lang = line if isinstance(line, tuple) else (line, case.language)
+        result = conv.turn(line, lang)
+        replies.append(result.reply)
         tools_used |= {e["tool"] for e in result.events if e["kind"] == "tool_call"}
         case.transcript += [f"  caller: {line}", f"  clerk:  {result.reply}"]
         if repo.filed or ("get_complaint_status" in tools_used and case.expect_tool == "get_complaint_status"):
@@ -158,6 +171,14 @@ def run(case: Case) -> tuple[bool, str, float]:
     said = re.sub(r"[\s,]", "", " ".join(case.transcript))  # "C V, 1 0, 0 4" -> "CV1004"
     if case.caller_hash and "1004" not in said and "St.Mary" not in said:
         problems.append("did not tell the caller about their complaint (CV-1004, St. Mary's School)")
+    if case.final_language:
+        from app.clerk.language import written_in
+        last_questions = [r for r in replies[1:-1]]  # after the switch, before the fixed tracking-ID line
+        if any(written_in(r, "kn-IN") != case.final_language for r in last_questions[1:]):
+            problems.append(f"did not settle into {case.final_language}")
+    if case.expect_landmark_question and not any(
+            w in " ".join(replies[:-1]).lower() for w in ("landmark", "street", "गली", "लैंडमार्क", "block", "ब्लॉक", "road", "रोड", "जगह")):
+        problems.append("never asked for a street or landmark")
     if case.expect_tool and case.expect_tool not in tools_used:
         problems.append(f"never called {case.expect_tool}")
     detail = "; ".join(problems) or (f"filed {filed['category']} @ {filed['place_name']}" if filed else "ok")

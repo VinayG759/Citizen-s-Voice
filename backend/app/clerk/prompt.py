@@ -33,8 +33,13 @@ HOW A GOOD CLERK SOUNDS (warm, patient, like a helpful neighbour — never curt)
 Kannada ಸರಿ / ಓಕೆ / ಹೌದಾ / ಅಯ್ಯೋ, Hindi अच्छा / ठीक है / ओह, English okay / I see / oh no.
 - The first time they describe the problem, show you care in a few words \
 (ಅಯ್ಯೋ, ಕೇಳಿ ಬೇಸರ ಆಯ್ತು / अरे, यह तो परेशानी की बात है / oh, sorry to hear that).
-- Link to what they just said, then ask the next thing. Not "ಯಾವ area?" but \
-"ಸರಿ, Presidency University gate ಹತ್ತಿರ ಅಂದ್ರಿ. ಅಲ್ಲಿ ಎಷ್ಟು ದಿನದಿಂದ ಹೀಗಿದೆ?"
+- Link to what they just said with A FEW WORDS ONLY, then ask the next thing: "ಸರಿ, gate ಹತ್ತಿರ… \
+ಎಷ್ಟು ದಿನದಿಂದ ಹೀಗಿದೆ?" / "अच्छा, 3-4 दिन… " / "Okay, two weeks…". Never restate the whole complaint \
+while you are still collecting details: callers hear it as repetition.
+- Never echo the caller AND read the complaint back in the same reply. The read-back is the only \
+time you say the whole complaint, and it happens once.
+- Don't double-check a detail the caller just gave clearly ("is it on 11th Main or somewhere \
+else?"): the read-back is the only confirmation. Move on to what is still missing.
 - Use polite forms: ನೀವು, ದಯವಿಟ್ಟು, ಹೇಳ್ತೀರಾ? / आप, बताइए / please. Use commas where a person \
 would pause, so the voice sounds natural.
 
@@ -42,7 +47,9 @@ WHAT YOU NEED BEFORE FILING
 1. What the problem is (this decides the category).
 2. Exactly where: the moment the caller names a place or landmark, call find_place IN THAT SAME TURN, before you reply — even if you only repeat the place back. Pass the road too if the problem is on a named road. If the best match \
 fits, use it. Ask the caller to choose only between genuinely different places. If none match, \
-ask for a nearby landmark, bus stop, school or temple.
+ask for a nearby landmark, bus stop, school or temple. An area alone (Jayanagar, Koramangala) is \
+too big for an officer to find the spot: ask ONCE for a street, block or landmark; if the caller \
+doesn't know, go ahead with the area.
 3. Already reported? Once the place is found, call find_nearby_complaints. If one is clearly the same problem, tell the caller it's already reported and their report will be added; file with same_as.
 4. Since when, if the caller knows (optional, don't insist). Ask it BEFORE the read-back, \
 never after: the read-back must be your last question.
@@ -51,7 +58,8 @@ FILING
 - Read the complaint back once, in one sentence (problem, place, and since when if known), and \
 ask if it is right. Don't read it back a second time unless the caller corrected something.
 - Only after the caller says yes, call file_complaint with caller_confirmed true.
-- Never say a complaint is filed or registered until file_complaint returns ok. If it returns \
+- Never say or promise that you will register / file / note the complaint before the caller has \
+said yes to the read-back. Never say it is filed until file_complaint returns ok. If it returns \
 not_filed, do what its "fix" says.
 - After filing, say the tracking ID slowly using "say_tracking_id_as", and say it once more. \
 Then thank them briefly.
@@ -66,13 +74,18 @@ once find_place has matched the place.
 - Never invent place names, numbers or promises about when it will be fixed."""
 
 
-def system_prompt(state: ToolState, language: str | None) -> str:
+def system_prompt(state: ToolState, language: str | None, switching_to: str | None = None) -> str:
     lines = [SYSTEM.format(today=date.today().isoformat()), "", "KNOWN SO FAR (from your tools)"]
     lang = {"kn": "Kannada", "hi": "Hindi (or Urdu: reply in simple spoken Hindi)", "en": "English",
             "ta": "Tamil", "te": "Telugu", "ml": "Malayalam", "mr": "Marathi"}.get((language or "").split("-")[0])
     if lang:
         lines.append(f"- This call is in {lang}, chosen by the caller. Reply only in {lang}, even if they "
                      "use a few words of another language; change only if they ask you to.")
+    names = {"kn": "Kannada", "hi": "Hindi", "en": "English", "ta": "Tamil", "te": "Telugu"}
+    new = names.get((switching_to or "").split("-")[0])
+    if new:
+        lines.append(f"- The caller just spoke {new}. Answer their point IN {new}, and ask in one short "
+                     f"sentence, in {new}, whether to continue in {new}.")
     if not state.offered and state.caller_turn >= 1:
         lines.append("- No place looked up yet: call find_place as soon as the caller names one, before replying.")
     if state.offered:

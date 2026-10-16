@@ -19,6 +19,7 @@ from fastapi.responses import Response
 
 from app import events
 from app.clerk.clerk import Conversation
+from app.clerk.language import written_in
 from app.phone.call import GREETING as GREETING_PARTS, greeting_text
 from app.db.repo import Repo
 from app.settings import get_settings
@@ -178,7 +179,7 @@ def speak(session_id: str = Form(...)) -> Response:
             raise HTTPException(429, "already spoken")
         _spoken[session_id] = (index, plays)
     try:
-        audio, ms = sarvam.speak(last.text, conv.language)
+        audio, ms = sarvam.speak(last.text, written_in(last.text, conv.language))
     except sarvam.SpeechError as e:
         log.warning("tts failed: %s", e)
         raise HTTPException(502, "could not speak") from e

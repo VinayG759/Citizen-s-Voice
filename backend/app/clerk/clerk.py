@@ -7,7 +7,7 @@ import time
 from dataclasses import dataclass, field
 
 from app import events
-from app.clerk.language import LanguageLock
+from app.clerk.language import LanguageLock, written_in
 from app.clerk.prompt import system_prompt
 from app.llm import router
 from app.llm.types import LLMError, Msg
@@ -103,7 +103,15 @@ class Conversation:
         lang = self.language.split("-")[0]
         self.state.caller_turn += 1
         start = len(self.messages)
-        self.messages.append(Msg("user", caller_text))
+        note = ""
+        if self.lock.pending:
+            # Attached to the caller's words for this turn (the caller never hears it): Gemma follows a
+            # note here far more reliably than one in its background instructions (golden run, 16 Oct).
+            new = {"kn": "Kannada", "hi": "Hindi", "en": "English", "ta": "Tamil", "te": "Telugu"}.get(
+                self.lock.pending.split("-")[0], "their language")
+            note = (f"\n[Note to clerk: the caller switched to {new}. Answer in {new}, and ask in one short "
+                    f"sentence whether to continue in {new}.]")
+        self.messages.append(Msg("user", caller_text + note))
         events: list[dict] = []
         llm_ms = 0
 
@@ -115,11 +123,11 @@ class Conversation:
             last_round = round_ == MAX_TOOL_ROUNDS
             try:
                 reply = router.generate(
-                    system=system_prompt(self.state, self.language),
+                    system=system_prompt(self.state, self.language, self.lock.pending),
                     messages=self.messages,
                     tools=[] if last_round else tools.SPECS,
                     mode="live",
-                    caller_language=self.language,
+                    caller_language=self.lock.pending or self.language,
                 )
             except LLMError as e:
                 log.error("clerk: no LLM reply: %s", e)
@@ -135,11 +143,12 @@ class Conversation:
             if not reply.tool_calls:
                 text = reply.text or SORRY.get(lang, SORRY["en"])
                 self.messages.append(Msg("model", text))
+                spoken_lang = written_in(text, self.language)
                 events.append(_event("decision", text="spoke", provider=reply.provider, model=reply.model, ms=reply.ms))
                 complaint = None
                 if self.state.filed is not None and filed_before is None:
                     complaint = {"tracking_id": self.state.filed.tracking_id}
-                return TurnResult(text, self.language, events, llm_ms, complaint)
+                return TurnResult(text, spoken_lang, events, llm_ms, complaint)
 
             self.messages.append(Msg("model", reply.text, tool_calls=reply.tool_calls))
             if callable(self.on_interim):

@@ -42,7 +42,7 @@ def test_typed_turn_gets_a_spoken_reply():
     assert r.status_code == 200
     body = r.json()
     assert body["reply"] == "ಯಾವ area?"
-    assert body["language"] == "en-IN"  # typed in English letters
+    assert body["language"] == "kn-IN"  # the reply is Kannada, so it is voiced in Kannada
     voice = client.post("/api/try/speak", data={"session_id": sid})
     assert voice.status_code == 200 and voice.headers["content-type"] == "audio/wav"
 
