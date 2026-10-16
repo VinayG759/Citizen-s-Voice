@@ -67,10 +67,10 @@ def speak(text: str, language: str, sample_rate: int | None = None) -> tuple[byt
         raise SpeechError(f"tts {type(e).__name__}") from e
     if r.status_code != 200:
         raise SpeechError(f"tts HTTP {r.status_code}")
-    return _join_wavs([base64.b64decode(a) for a in r.json()["audios"]]), int((time.perf_counter() - t0) * 1000)
+    return join_wavs([base64.b64decode(a) for a in r.json()["audios"]]), int((time.perf_counter() - t0) * 1000)
 
 
-def _join_wavs(parts: list[bytes]) -> bytes:
+def join_wavs(parts: list[bytes]) -> bytes:
     """Sarvam may return long speech in several WAV pieces: join their audio into one WAV."""
     if len(parts) == 1:
         return parts[0]

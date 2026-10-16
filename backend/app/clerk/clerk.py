@@ -7,6 +7,7 @@ import time
 from dataclasses import dataclass, field
 
 from app import events
+from app.clerk.language import LanguageLock
 from app.clerk.prompt import system_prompt
 from app.llm import router
 from app.llm.types import LLMError, Msg
@@ -80,6 +81,13 @@ class Conversation:
     messages: list[Msg] = field(default_factory=list)
     state: tools.ToolState = field(default_factory=tools.ToolState)
     _raised: bool = False
+    lock: LanguageLock = field(default_factory=LanguageLock)
+    # Called with Gemma's short "let me check…" words when it uses a tool, so the phone can say
+    # them at once instead of leaving the caller in silence while the tool runs.
+    on_interim: object = None
+
+    def __post_init__(self) -> None:
+        self.lock.language = self.language  # a conversation started in a language keeps it until told otherwise
 
     def turn(self, caller_text: str, language: str | None = None) -> TurnResult:
         """One caller turn; the dashboard hears about it as it finishes."""
@@ -90,10 +98,8 @@ class Conversation:
         return result
 
     def _turn(self, caller_text: str, language: str | None = None) -> TurnResult:
-        if language:
-            # Sarvam can hear Urdu but not speak it; spoken Hindi and Urdu are mutually
-            # understood, so an Urdu caller is answered in spoken Hindi.
-            self.language = "hi-IN" if language.startswith("ur") else language
+        # The caller's first reply chooses the language; after that it stays (see language.py).
+        self.language = self.lock.update(language, caller_text)
         lang = self.language.split("-")[0]
         self.state.caller_turn += 1
         start = len(self.messages)
@@ -136,6 +142,12 @@ class Conversation:
                 return TurnResult(text, self.language, events, llm_ms, complaint)
 
             self.messages.append(Msg("model", reply.text, tool_calls=reply.tool_calls))
+            if callable(self.on_interim):
+                # Gemma's own words if it wrote any, else a line built from what it is looking up —
+                # so the caller hears "ಸರಿ, Jayanagar, ನೋಡ್ತೀನಿ…" while the tool runs, not silence.
+                words = reply.text or _while_checking(reply.tool_calls[0], lang)
+                if words:
+                    self.on_interim(words, self.language)
             for call in reply.tool_calls:
                 events.append(_event("tool_call", tool=call.name, args=call.args, provider=reply.provider, ms=reply.ms))
                 result = self._run_tool(call.name, call.args)
@@ -183,6 +195,32 @@ class Conversation:
         out_size = len(json.dumps(out, ensure_ascii=False))
         log.info("tool %s %.0fms %dB", name, (time.perf_counter() - t0) * 1000, out_size)
         return out
+
+
+# Spoken while a tool runs, in the call's language. {q} is what Gemma is looking up.
+WHILE_CHECKING = {
+    "find_place": {"kn": "ಸರಿ, {q}, ನೋಡ್ತೀನಿ.", "hi": "अच्छा, {q}, देखती हूँ.", "en": "Okay, {q}, let me check.",
+                   "ta": "சரி, {q}, பார்க்கிறேன்.", "te": "సరే, {q}, చూస్తాను."},
+    "find_nearby_complaints": {"kn": "ಇದು ಮೊದಲೇ report ಆಗಿದ್ಯಾ ನೋಡ್ತೀನಿ.", "hi": "देखती हूँ, यह पहले report हुआ है क्या.",
+                               "en": "Let me see if this was already reported.",
+                               "ta": "இது முன்பே report ஆகியிருக்கான்னு பார்க்கிறேன்.",
+                               "te": "ఇది ముందే report అయిందేమో చూస్తాను."},
+    "get_complaint_status": {"kn": "ಸರಿ, ನಿಮ್ಮ complaint ನೋಡ್ತೀನಿ.", "hi": "ठीक है, आपकी complaint देखती हूँ.",
+                             "en": "Okay, let me look up your complaint.",
+                             "ta": "சரி, உங்க complaint பார்க்கிறேன்.", "te": "సరే, మీ complaint చూస్తాను."},
+}
+
+
+def _while_checking(call, lang: str) -> str | None:
+    """A short spoken line for the tool Gemma just started; None for tools that need none."""
+    by_lang = WHILE_CHECKING.get(call.name)
+    if not by_lang:
+        return None
+    q = str(call.args.get("query") or "").strip()[:60]
+    template = by_lang.get(lang, by_lang["en"])
+    if "{q}" in template and not q:
+        return None
+    return template.format(q=q)
 
 
 def _event(kind: str, **payload) -> dict:

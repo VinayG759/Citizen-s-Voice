@@ -190,3 +190,25 @@ def test_a_wrong_script_reply_is_retried_with_the_bigger_model_and_a_reminder(mo
     reply = router.generate(system="clerk", messages=[], tools=[], caller_language="kn-IN")
     assert reply.text == "ಯಾವ area ಅಲ್ಲಿ ಇದೆ?"
     assert calls == [("google/gemma-4-26b-a4b-it", False), ("google/gemma-4-31b-it", True)]
+
+
+def test_the_first_reply_chooses_the_language_and_it_stays():
+    from app.clerk.language import LanguageLock
+    lock = LanguageLock()
+    assert lock.update("en-IN", "There are potholes near my house") == "en-IN"
+    assert lock.update("kn-IN", "Presidency University gate") == "en-IN"   # one turn elsewhere: no flip
+    assert lock.update("en-IN", "Yes, that's right") == "en-IN"
+    assert lock.update("hi-IN", "हाँ") == "en-IN"
+    assert lock.update("hi-IN", "मुझे हिंदी में बात करनी है, सड़क खराब है") == "hi-IN"  # two turns in a row: follow
+
+
+def test_naming_a_language_chooses_it():
+    from app.clerk.language import LanguageLock
+    lock = LanguageLock()
+    assert lock.update("kn-IN", "English") == "en-IN"
+    assert lock.update("en-IN", "ಕನ್ನಡದಲ್ಲಿ ಮಾತಾಡಿ") == "kn-IN"
+
+
+def test_urdu_callers_are_answered_in_hindi():
+    from app.clerk.language import LanguageLock
+    assert LanguageLock().update("ur-IN", "پانی نہیں آ رہا") == "hi-IN"

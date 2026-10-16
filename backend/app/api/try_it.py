@@ -19,7 +19,7 @@ from fastapi.responses import Response
 
 from app import events
 from app.clerk.clerk import Conversation
-from app.phone.call import CLIPS
+from app.phone.call import GREETING as GREETING_PARTS, greeting_text
 from app.db.repo import Repo
 from app.settings import get_settings
 from app.speech import sarvam
@@ -34,7 +34,7 @@ RATE_LIMIT_TURNS = 20  # per visitor IP …
 RATE_LIMIT_WINDOW_S = 10 * 60  # … per 10 minutes
 
 # The same greeting as the phone line (one copy, so they can't drift apart).
-GREETING = {"text": CLIPS["greeting"][0], "language": CLIPS["greeting"][1]}
+GREETING = {"text": greeting_text(), "language": "kn-IN"}
 
 _sessions: dict[str, tuple[Conversation, float]] = {}
 _turn_times: dict[str, list[float]] = {}
@@ -69,6 +69,16 @@ def _prune() -> None:
         _sessions.pop(min(_sessions, key=lambda k: _sessions[k][1]), None)
 
 
+def _greeting_b64() -> str | None:
+    """Each language of the greeting in its own voice settings, joined into one recording."""
+    try:
+        wav = sarvam.join_wavs([sarvam.speak(text, lang)[0] for text, lang in GREETING_PARTS])
+        return base64.b64encode(wav).decode()
+    except sarvam.SpeechError as e:
+        log.warning("greeting tts failed: %s", e)
+        return None  # the page still shows the text
+
+
 def _speak_b64(text: str, language: str) -> tuple[str | None, int]:
     try:
         audio, ms = sarvam.speak(text, language)
@@ -91,7 +101,7 @@ def start() -> dict:
         _sessions[sid] = (Conversation(call_id=call_id, repo=repo, channel="web", caller_hash=caller_hash), time.time())
     events.publish("call_started", call_id=call_id, channel="web", greeting=GREETING["text"])
     if _greeting_audio is None:
-        _greeting_audio, _ = _speak_b64(GREETING["text"], GREETING["language"])
+        _greeting_audio = _greeting_b64()
     return {"session_id": sid, "greeting": GREETING["text"], "greeting_audio": _greeting_audio}
 
 

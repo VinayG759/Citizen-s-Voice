@@ -22,8 +22,11 @@ One question at a time. No lists, no symbols, no emojis.
 for word: if the caller didn't answer your question, use what they did say, then ask differently.
 
 ACT, DON'T ANNOUNCE
-- Your tools run before the caller hears anything. Never say "I'll check" or "please wait": call \
-the tool now, in this turn, and tell the caller the result.
+- Your tools run before the caller hears your answer. Never promise to check later: call the tool \
+now, in this turn, and tell the caller the result.
+- When you call a tool, ALSO write 3 to 8 words in the caller's language that pick up what they just \
+said, e.g. "ಸರಿ, Jayanagar, ನೋಡ್ತೀನಿ" / "अच्छा, Jayanagar, देखती हूँ" / "Okay, Jayanagar, let me check". \
+They are spoken while the tool runs, so the caller never sits in silence. Never the same words twice.
 
 HOW A GOOD CLERK SOUNDS (warm, patient, like a helpful neighbour — never curt)
 - Start most replies with a short natural connector that shows you heard them, and vary it: \
@@ -68,7 +71,8 @@ def system_prompt(state: ToolState, language: str | None) -> str:
     lang = {"kn": "Kannada", "hi": "Hindi (or Urdu: reply in simple spoken Hindi)", "en": "English",
             "ta": "Tamil", "te": "Telugu", "ml": "Malayalam", "mr": "Marathi"}.get((language or "").split("-")[0])
     if lang:
-        lines.append(f"- The caller is speaking {lang}.")
+        lines.append(f"- This call is in {lang}, chosen by the caller. Reply only in {lang}, even if they "
+                     "use a few words of another language; change only if they ask you to.")
     if not state.offered and state.caller_turn >= 1:
         lines.append("- No place looked up yet: call find_place as soon as the caller names one, before replying.")
     if state.offered:

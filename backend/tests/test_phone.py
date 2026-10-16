@@ -144,7 +144,8 @@ def test_a_call_greets_listens_and_answers(monkeypatch):
         assert greeting["media"]["contentType"] == "audio/x-l16" and greeting["streamId"] == "s-1"
         ws.send_text(json.dumps({"event": "playedStream", "name": next_event("checkpoint")["name"]}))
 
-        for chunk in audio.chunks(tone(1000) + silence(900), RATE, ms=20):  # the caller speaks, then pauses
+        # the caller speaks, then pauses longer than the first-turn patience (1.5 s)
+        for chunk in audio.chunks(tone(1000) + silence(call_mod.FIRST_TURN_SILENCE_MS + 200), RATE, ms=20):
             ws.send_text(json.dumps({"event": "media", "media": {
                 "payload": base64.b64encode(chunk).decode()}}))
         next_event("playAudio")  # the clerk's reply starts playing
@@ -153,3 +154,19 @@ def test_a_call_greets_listens_and_answers(monkeypatch):
 
     assert spoken[0].startswith("ನಮಸ್ಕಾರ")  # greeting
     assert "ಯಾವ area?" in spoken  # Gemma's reply was spoken
+
+
+def test_a_short_pause_mid_sentence_does_not_end_the_turn():
+    # Real call, 16 Oct: a caller pausing to think was cut off at 0.7 s.
+    eos = audio.EndOfSpeech(silence_ms=call_mod.SILENCE_MS)
+    assert feed_all(eos, tone(800) + silence(900) + tone(800)) is None  # still talking after a 0.9 s pause
+
+
+def test_fixed_lines_follow_the_call_language_and_rotate(monkeypatch):
+    said = []
+    monkeypatch.setattr(call_mod.sarvam, "speak", lambda t, l, sample_rate=None: said.append((t, l)) or (audio.pcm_to_wav(tone(50)), 1))
+    call_mod.clip("filler", "en-IN")
+    call_mod.clip("filler", "en-IN")
+    call_mod.clip("sorry", "hi-IN")
+    assert said[0][1] == "en-IN" and said[0][0] != said[1][0]  # English, and not the same words twice
+    assert said[2] == (call_mod.LINES["sorry"]["hi-IN"][0], "hi-IN")

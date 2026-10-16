@@ -19,40 +19,101 @@ from app.speech import sarvam
 
 log = logging.getLogger(__name__)
 
-FILLER_AFTER_S = 1.0  # play "one moment" if the reply isn't ready by then
+FALLBACK_FILLER_AFTER_S = 3.0  # only if neither Gemma's own words nor its reply have arrived by then
 NUDGE_AFTER_S = 10  # silence → "are you there?"
 GIVE_UP_AFTER_S = 25  # silence → goodbye
 MAX_CALL_S = 6 * 60
+FIRST_TURN_SILENCE_MS = 1500  # people settle in on the first turn; don't cut them off
+SILENCE_MS = 1200  # a real call cut a caller off mid-sentence at 0.7 s
 
-# Short fixed lines, spoken by Sarvam once and cached. Kannada first: the helpline's main language.
-CLIPS = {
-    "greeting": ("ನಮಸ್ಕಾರ, Citizen's Voice ಗೆ ಸ್ವಾಗತ. ನಿಮ್ಮ area ಅಲ್ಲಿ ಏನಾದ್ರೂ problem ಇದ್ಯಾ? ಹೇಳಿ, "
-                 "ನಾನು complaint register ಮಾಡ್ತೀನಿ. You can also speak in English or Hindi.", "kn-IN"),
-    "filler": ("ಸರಿ, ಒಂದು ನಿಮಿಷ, ನೋಡ್ತೀನಿ.", "kn-IN"),
-    "sorry": ("ಕ್ಷಮಿಸಿ, ಸರಿಯಾಗಿ ಕೇಳಿಸ್ಲಿಲ್ಲ. ಇನ್ನೊಂದ್ಸಲ ಹೇಳ್ತೀರಾ?", "kn-IN"),
-    "nudge": ("ಹಲೋ, line ಅಲ್ಲಿ ಇದ್ದೀರಾ? ನಿಧಾನವಾಗಿ ಹೇಳಿ, ನಾನು ಕೇಳ್ತಿದ್ದೀನಿ.", "kn-IN"),
-    "goodbye": ("ಸರಿ, ಏನಾದ್ರೂ ಬೇಕಾದ್ರೆ ಮತ್ತೆ call ಮಾಡಿ. ಧನ್ಯವಾದಗಳು.", "kn-IN"),
-    "technical": ("ಕ್ಷಮಿಸಿ, ನಮ್ಮ ಕಡೆ ಒಂದು technical problem ಆಯ್ತು. ದಯವಿಟ್ಟು ಸ್ವಲ್ಪ ಹೊತ್ತಾದ ಮೇಲೆ "
-                  "ಮತ್ತೆ call ಮಾಡಿ.", "kn-IN"),
+# The greeting: each language spoken in its own voice settings, then joined. The caller answers in
+# the language they want (see clerk/language.py).
+GREETING = [
+    ("ನಮಸ್ಕಾರ, Citizen's Voice ಗೆ ಸ್ವಾಗತ. ಕನ್ನಡದಲ್ಲಿ ಮಾತಾಡೋಕೆ, ಕನ್ನಡದಲ್ಲೇ ಹೇಳಿ.", "kn-IN"),
+    ("हिंदी में बात करने के लिए, हिंदी में बोलिए.", "hi-IN"),
+    ("For English, just speak in English. Please tell me the problem in your area.", "en-IN"),
+]
+
+# Fixed lines, written the way people SAY them (the voice reads spelling literally: "ಒಂದ್ನಿಮಿಷ",
+# not "ಒಂದು ನಿಮಿಷ"). Lists rotate so the caller doesn't hear the same words every time.
+LINES = {
+    "filler": {
+        "kn-IN": ["ಸರಿ, ಒಂದ್ನಿಮಿಷ.", "ಹಾಂ, ಒಂದ್ಸೆಕೆಂಡ್.", "ಓಕೆ, ನೋಡ್ತಿದ್ದೀನಿ."],
+        "hi-IN": ["ठीक है, एक मिनट.", "हाँ, एक सेकंड.", "अच्छा, देख रही हूँ."],
+        "en-IN": ["Okay, one moment.", "Sure, just a second.", "Alright, checking."],
+        "ta-IN": ["சரி, ஒரு நிமிஷம்.", "ஒரு செகண்ட்."],
+        "te-IN": ["సరే, ఒక్క నిమిషం.", "ఒక్క సెకండ్."],
+    },
+    "sorry": {
+        "kn-IN": ["ಕ್ಷಮಿಸಿ, ಸರಿಯಾಗಿ ಕೇಳಿಸ್ಲಿಲ್ಲ. ಇನ್ನೊಂದ್ಸಲ ಹೇಳ್ತೀರಾ?"],
+        "hi-IN": ["माफ़ कीजिए, ठीक से सुनाई नहीं दिया. एक बार फिर बताएँगे?"],
+        "en-IN": ["Sorry, I didn't catch that. Could you say it once more?"],
+        "ta-IN": ["மன்னிக்கவும், சரியா கேட்கல. இன்னொரு தடவை சொல்ல முடியுமா?"],
+        "te-IN": ["క్షమించండి, సరిగ్గా వినపడలేదు. ఇంకోసారి చెప్తారా?"],
+    },
+    "nudge": {
+        "kn-IN": ["ಹಲೋ, line ಅಲ್ಲಿ ಇದ್ದೀರಾ? ನಿಧಾನವಾಗಿ ಹೇಳಿ, ನಾನು ಕೇಳ್ತಿದ್ದೀನಿ."],
+        "hi-IN": ["हलो, आप line पर हैं? आराम से बताइए, मैं सुन रही हूँ."],
+        "en-IN": ["Hello, are you still there? Take your time, I'm listening."],
+        "ta-IN": ["ஹலோ, line-ல இருக்கீங்களா? நிதானமா சொல்லுங்க, நான் கேட்டுக்கிட்டு இருக்கேன்."],
+        "te-IN": ["హలో, line లో ఉన్నారా? నెమ్మదిగా చెప్పండి, నేను వింటున్నాను."],
+    },
+    "goodbye": {
+        "kn-IN": ["ಸರಿ, ಏನಾದ್ರೂ ಬೇಕಾದ್ರೆ ಮತ್ತೆ call ಮಾಡಿ. ಧನ್ಯವಾದಗಳು."],
+        "hi-IN": ["ठीक है, कुछ भी ज़रूरत हो तो फिर call कीजिए. धन्यवाद."],
+        "en-IN": ["Alright, call us again any time. Thank you."],
+        "ta-IN": ["சரி, ஏதாவது தேவைன்னா மறுபடியும் call பண்ணுங்க. நன்றி."],
+        "te-IN": ["సరే, ఏదైనా అవసరమైతే మళ్ళీ call చేయండి. ధన్యవాదాలు."],
+    },
+    "technical": {
+        "kn-IN": ["ಕ್ಷಮಿಸಿ, ನಮ್ಮ ಕಡೆ ಒಂದು technical problem ಆಯ್ತು. ಸ್ವಲ್ಪ ಹೊತ್ತಾದ ಮೇಲೆ ಮತ್ತೆ call ಮಾಡಿ."],
+        "hi-IN": ["माफ़ कीजिए, हमारी तरफ़ एक technical problem आ गई. थोड़ी देर बाद फिर call कीजिए."],
+        "en-IN": ["Sorry, we have a technical problem on our side. Please call again in a little while."],
+        "ta-IN": ["மன்னிக்கவும், எங்க பக்கம் ஒரு technical problem. கொஞ்ச நேரம் கழிச்சு call பண்ணுங்க."],
+        "te-IN": ["క్షమించండి, మా వైపు technical problem వచ్చింది. కాసేపటి తర్వాత మళ్ళీ call చేయండి."],
+    },
 }
-_clip_cache: dict[str, tuple[bytes, int]] = {}
+_clip_cache: dict[tuple, tuple[bytes, int]] = {}
+_rotation: dict[tuple, int] = {}
 
 
-def clip(name: str) -> tuple[bytes, int]:
-    """PCM and sample rate for a fixed line (spoken by Sarvam on first use, then cached)."""
-    if name not in _clip_cache:
-        text, lang = CLIPS[name]
+def _pcm(text: str, lang: str) -> tuple[bytes, int]:
+    key = ("text", text, lang)
+    if key not in _clip_cache:
         wav, _ = sarvam.speak(text, lang, sample_rate=audio.RATE)
-        _clip_cache[name] = audio.wav_to_pcm(wav)
-    return _clip_cache[name]
+        _clip_cache[key] = audio.wav_to_pcm(wav)
+    return _clip_cache[key]
+
+
+def greeting_pcm() -> tuple[bytes, int]:
+    parts = [_pcm(text, lang) for text, lang in GREETING]
+    return b"".join(p for p, _ in parts), audio.RATE
+
+
+def greeting_text() -> str:
+    return " ".join(text for text, _ in GREETING)
+
+
+def clip(name: str, lang: str = "kn-IN") -> tuple[bytes, int]:
+    """A fixed line in the call's language (English if we have no version), rotating variants."""
+    options = LINES[name].get(lang) or LINES[name]["en-IN"]
+    i = _rotation.get((name, lang), 0)
+    _rotation[(name, lang)] = i + 1
+    return _pcm(options[i % len(options)], lang if lang in LINES[name] else "en-IN")
 
 
 def warm_clips() -> None:
-    for name in CLIPS:
-        try:
-            clip(name)
-        except Exception as e:  # warming is best-effort; clips are made on first use otherwise
-            log.warning("could not prepare clip %s: %s", name, e)
+    try:
+        greeting_pcm()
+    except Exception as e:  # warming is best-effort; lines are made on first use otherwise
+        log.warning("could not prepare greeting: %s", e)
+    for name, by_lang in LINES.items():
+        for lang, texts in by_lang.items():
+            for text in texts:
+                try:
+                    _pcm(text, lang)
+                except Exception as e:
+                    log.warning("could not prepare %s/%s: %s", name, lang, e)
 
 
 class PhoneCall:
@@ -61,7 +122,7 @@ class PhoneCall:
         self.stream_id = stream_id
         self.call_uuid = call_uuid
         self.conv = conv
-        self.eos = audio.EndOfSpeech()
+        self.eos = audio.EndOfSpeech(silence_ms=FIRST_TURN_SILENCE_MS)
         self.listening = False
         self.last_heard = time.monotonic()
         self.started = time.monotonic()
@@ -93,12 +154,22 @@ class PhoneCall:
                 self._played.pop(name, None)
 
     async def say_clip(self, name: str, wait: bool = True) -> None:
-        pcm, rate = await asyncio.to_thread(clip, name)
+        """A fixed line, in the language this call is in."""
+        pcm, rate = await asyncio.to_thread(clip, name, self.conv.language)
         await self.play(pcm, rate, wait)
+
+    async def say_text(self, text: str, lang: str) -> None:
+        """Speak words Gemma just produced (not a fixed line), without waiting for playback."""
+        try:
+            wav, _ = await asyncio.to_thread(sarvam.speak, text, lang, audio.RATE)
+            await self.play(*audio.wav_to_pcm(wav), wait=False)
+        except (sarvam.SpeechError, ValueError) as e:
+            log.warning("call %s: interim tts failed: %s", self.call_uuid, e)
 
     # ---- the conversation --------------------------------------------
     async def start(self) -> None:
-        await self.say_clip("greeting")
+        pcm, rate = await asyncio.to_thread(greeting_pcm)
+        await self.play(pcm, rate)
         self.listen()
 
     def listen(self) -> None:
@@ -133,11 +204,21 @@ class PhoneCall:
             await self.say_clip("sorry")
             return self.listen()
 
+        # When Gemma uses a tool it also says a few words ("ಸರಿ, Jayanagar, ನೋಡ್ತೀನಿ…"); those are
+        # spoken straight away while the tool runs. They come from a worker thread, so hand them to
+        # this event loop.
+        loop = asyncio.get_running_loop()
+        interim: list[asyncio.Future] = []
+        self.conv.on_interim = lambda text, lang: interim.append(
+            asyncio.run_coroutine_threadsafe(self.say_text(text, lang), loop))
         turn = asyncio.create_task(asyncio.to_thread(self.conv.turn, heard.text, heard.language))
-        done, _ = await asyncio.wait({turn}, timeout=FILLER_AFTER_S)
-        if not done:
-            await self.say_clip("filler", wait=False)  # fills the silence while Gemma decides
+        done, _ = await asyncio.wait({turn}, timeout=FALLBACK_FILLER_AFTER_S)
+        if not done and not interim:
+            await self.say_clip("filler", wait=False)  # last resort: nothing from Gemma yet
         result = await turn
+        for f in interim:  # Gemma's own interim words go out before its reply
+            await asyncio.wrap_future(f)
+        self.eos.silence_ms = SILENCE_MS  # after the first turn, the normal patience
 
         try:
             wav, tts_ms = await asyncio.to_thread(sarvam.speak, result.reply, result.language, audio.RATE)

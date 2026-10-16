@@ -10,6 +10,7 @@ from app.llm.types import LLMReply
 from app.speech.sarvam import Heard
 
 client = TestClient(main.app)
+TINY_WAV = __import__("app.phone.audio", fromlist=["pcm_to_wav"]).pcm_to_wav(bytes(320))  # 10 ms of silence
 
 
 class FakeRepo:
@@ -22,7 +23,7 @@ class FakeRepo:
 @pytest.fixture(autouse=True)
 def fakes(monkeypatch):
     monkeypatch.setattr(try_it, "Repo", FakeRepo)
-    monkeypatch.setattr(try_it.sarvam, "speak", lambda text, lang: (b"RIFF-fake-wav", 3))
+    monkeypatch.setattr(try_it.sarvam, "speak", lambda text, lang: (TINY_WAV, 3))
     monkeypatch.setattr(try_it.sarvam, "transcribe", lambda *a: Heard("ರಸ್ತೆಯಲ್ಲಿ ಹಳ್ಳಗಳು ಇವೆ", "kn-IN", 4))
     monkeypatch.setattr(clerk_mod.router, "generate", lambda **_: LLMReply("ಯಾವ area?", [], "fake", "fake", 5))
     try_it._sessions.clear()
@@ -82,10 +83,10 @@ def test_one_visitor_cannot_flood_gemma():
 
 def test_greeting_is_spoken_once_and_reused(monkeypatch):
     calls = []
-    monkeypatch.setattr(try_it.sarvam, "speak", lambda t, l: calls.append(t) or (b"wav", 1))
+    monkeypatch.setattr(try_it.sarvam, "speak", lambda t, l: calls.append((t, l)) or (TINY_WAV, 1))
     start()
     start()
-    assert len(calls) == 1
+    assert [lang for _, lang in calls] == ["kn-IN", "hi-IN", "en-IN"]  # each part in its own language, once
 
 
 def test_a_reply_can_be_voiced_at_most_twice():
