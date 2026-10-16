@@ -28,3 +28,6 @@ Thumbs.db
 
 # OpenStreetMap download cache (rebuildable)
 .cache/
+
+# voice comparisons, local only
+voice-samples/

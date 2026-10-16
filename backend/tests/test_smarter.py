@@ -11,6 +11,13 @@ from app.tools import clerk_tools
 PRESIDENCY = "osm-w780259661"
 
 
+def offer_presidency(state, turn=0):
+    """Put the Rajanukunte campus in front of the tools directly: there are two Presidency University
+    campuses in Bengaluru, and these tests are about filing rules, not search ranking."""
+    from app.places import gazetteer as g
+    state.offered[PRESIDENCY] = clerk_tools.OfferedPlace(g.by_id()[PRESIDENCY], turn)
+
+
 class Repo:
     """One open pothole complaint (CV-1042, 3 reports so far) near Presidency University."""
 
@@ -43,7 +50,7 @@ class Repo:
 
 def ready_state():
     s = clerk_tools.ToolState()
-    clerk_tools.find_place(s, "Presidency University")
+    offer_presidency(s)
     s.caller_turn = 2
     return s
 
@@ -82,7 +89,7 @@ def test_status_without_a_number_finds_only_the_callers_own_complaint():
 def test_the_caller_hears_they_are_the_fourth_reporter(monkeypatch):
     repo = Repo()
     conv = Conversation(call_id=1, repo=repo, language="en-IN")
-    clerk_tools.find_place(conv.state, "Presidency University")
+    offer_presidency(conv.state)
     clerk_tools.find_nearby_complaints(conv.state, repo, PRESIDENCY, "road")
     conv.state.caller_turn = 1
     replies = iter([LLMReply("", [ToolCall("t1", "file_complaint", dict(
@@ -90,5 +97,5 @@ def test_the_caller_hears_they_are_the_fourth_reporter(monkeypatch):
         "fake", "fake", 5)])
     monkeypatch.setattr(clerk_mod.router, "generate", lambda **_: next(replies))
     result = conv.turn("Yes, that's right")
-    assert "person number 4" in result.reply and "C V 1 0 4 2" in result.reply
+    assert "person number 4" in result.reply and "C V, 1 0, 4 2" in result.reply
     assert result.complaint == {"tracking_id": "CV-1042"}

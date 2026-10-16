@@ -7,6 +7,7 @@ Run:  python -m scripts.golden            (all)
       python -m scripts.golden 3 8        (only these numbers)
 """
 
+import re
 import sys
 import time
 from dataclasses import dataclass, field
@@ -154,9 +155,9 @@ def run(case: Case) -> tuple[bool, str, float]:
         problems.append(f"place {filed['place_name']!r} lacks {case.place_contains!r}")
     if case.same_as and (not filed or filed.get("same_as") != case.same_as):
         problems.append(f"not added to CV-{case.same_as}")
-    said = " ".join(case.transcript)
-    if case.caller_hash and not any(x in said for x in ("1004", "1 0 0 4")):
-        problems.append("did not tell the caller about CV-1004")
+    said = re.sub(r"[\s,]", "", " ".join(case.transcript))  # "C V, 1 0, 0 4" -> "CV1004"
+    if case.caller_hash and "1004" not in said and "St.Mary" not in said:
+        problems.append("did not tell the caller about their complaint (CV-1004, St. Mary's School)")
     if case.expect_tool and case.expect_tool not in tools_used:
         problems.append(f"never called {case.expect_tool}")
     detail = "; ".join(problems) or (f"filed {filed['category']} @ {filed['place_name']}" if filed else "ok")

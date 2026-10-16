@@ -58,6 +58,8 @@ def speak(text: str, language: str, sample_rate: int | None = None) -> tuple[byt
             TTS_URL,
             headers={"api-subscription-key": s.sarvam_api_key},
             json={"text": text[:1500], "target_language_code": lang, "model": s.sarvam_tts_model,
+                  "speaker": s.sarvam_tts_speaker, "pace": s.sarvam_tts_pace,
+                  "temperature": s.sarvam_tts_temperature,
                   **({"speech_sample_rate": sample_rate} if sample_rate else {})},
             timeout=20,
         )

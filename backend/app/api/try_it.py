@@ -19,6 +19,7 @@ from fastapi.responses import Response
 
 from app import events
 from app.clerk.clerk import Conversation
+from app.phone.call import CLIPS
 from app.db.repo import Repo
 from app.settings import get_settings
 from app.speech import sarvam
@@ -32,11 +33,8 @@ MAX_SESSIONS = 300
 RATE_LIMIT_TURNS = 20  # per visitor IP …
 RATE_LIMIT_WINDOW_S = 10 * 60  # … per 10 minutes
 
-GREETING = {
-    "text": "ನಮಸ್ಕಾರ, Citizen's Voice ಗೆ ಸ್ವಾಗತ. ನಿಮ್ಮ area ಅಲ್ಲಿ ಏನು problem ಇದೆ ಹೇಳಿ. "
-            "You can also speak in English or Hindi.",
-    "language": "kn-IN",
-}
+# The same greeting as the phone line (one copy, so they can't drift apart).
+GREETING = {"text": CLIPS["greeting"][0], "language": CLIPS["greeting"][1]}
 
 _sessions: dict[str, tuple[Conversation, float]] = {}
 _turn_times: dict[str, list[float]] = {}

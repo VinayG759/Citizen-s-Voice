@@ -26,13 +26,14 @@ MAX_CALL_S = 6 * 60
 
 # Short fixed lines, spoken by Sarvam once and cached. Kannada first: the helpline's main language.
 CLIPS = {
-    "greeting": ("ನಮಸ್ಕಾರ, Citizen's Voice. ನಿಮ್ಮ area ಅಲ್ಲಿ ಏನು problem ಇದೆ ಹೇಳಿ. "
-                 "You can also speak in English or Hindi.", "kn-IN"),
-    "filler": ("ಹ್ಞೂ, ಒಂದು ನಿಮಿಷ.", "kn-IN"),
-    "sorry": ("ಕ್ಷಮಿಸಿ, ಸರಿಯಾಗಿ ಕೇಳಿಸಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಹೇಳಿ.", "kn-IN"),
-    "nudge": ("ಹಲೋ, ಇದ್ದೀರಾ? ನಿಮ್ಮ problem ಹೇಳಿ.", "kn-IN"),
-    "goodbye": ("ಸರಿ, ಮತ್ತೆ call ಮಾಡಿ. ಧನ್ಯವಾದಗಳು.", "kn-IN"),
-    "technical": ("ಕ್ಷಮಿಸಿ, ಒಂದು technical problem ಆಯ್ತು. ದಯವಿಟ್ಟು ಸ್ವಲ್ಪ ಹೊತ್ತಿನ ನಂತರ call ಮಾಡಿ.", "kn-IN"),
+    "greeting": ("ನಮಸ್ಕಾರ, Citizen's Voice ಗೆ ಸ್ವಾಗತ. ನಿಮ್ಮ area ಅಲ್ಲಿ ಏನಾದ್ರೂ problem ಇದ್ಯಾ? ಹೇಳಿ, "
+                 "ನಾನು complaint register ಮಾಡ್ತೀನಿ. You can also speak in English or Hindi.", "kn-IN"),
+    "filler": ("ಸರಿ, ಒಂದು ನಿಮಿಷ, ನೋಡ್ತೀನಿ.", "kn-IN"),
+    "sorry": ("ಕ್ಷಮಿಸಿ, ಸರಿಯಾಗಿ ಕೇಳಿಸ್ಲಿಲ್ಲ. ಇನ್ನೊಂದ್ಸಲ ಹೇಳ್ತೀರಾ?", "kn-IN"),
+    "nudge": ("ಹಲೋ, line ಅಲ್ಲಿ ಇದ್ದೀರಾ? ನಿಧಾನವಾಗಿ ಹೇಳಿ, ನಾನು ಕೇಳ್ತಿದ್ದೀನಿ.", "kn-IN"),
+    "goodbye": ("ಸರಿ, ಏನಾದ್ರೂ ಬೇಕಾದ್ರೆ ಮತ್ತೆ call ಮಾಡಿ. ಧನ್ಯವಾದಗಳು.", "kn-IN"),
+    "technical": ("ಕ್ಷಮಿಸಿ, ನಮ್ಮ ಕಡೆ ಒಂದು technical problem ಆಯ್ತು. ದಯವಿಟ್ಟು ಸ್ವಲ್ಪ ಹೊತ್ತಾದ ಮೇಲೆ "
+                  "ಮತ್ತೆ call ಮಾಡಿ.", "kn-IN"),
 }
 _clip_cache: dict[str, tuple[bytes, int]] = {}
 

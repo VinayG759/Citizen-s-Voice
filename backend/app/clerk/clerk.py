@@ -28,9 +28,12 @@ SORRY = {
 # Said right after a successful filing: fixed wording, so the tracking ID is always read
 # correctly and the caller doesn't wait for another model call.
 FILED = {
-    "kn": "ನಿಮ್ಮ complaint register ಆಗಿದೆ. Tracking ID {sid}. ಮತ್ತೊಮ್ಮೆ: {sid}. ಧನ್ಯವಾದಗಳು.",
-    "hi": "आपकी complaint register हो गई है। Tracking ID {sid}. फिर से: {sid}. धन्यवाद।",
-    "en": "Your complaint is registered. Tracking ID {sid}. Once more: {sid}. Thank you.",
+    "kn": "ಸರಿ, ನಿಮ್ಮ complaint register ಆಗಿದೆ. ನಿಮ್ಮ tracking ID... {sid}. ಇನ್ನೊಂದ್ಸಲ ಹೇಳ್ತೀನಿ... {sid}. "
+          "Call ಮಾಡಿದ್ದಕ್ಕೆ ಧನ್ಯವಾದಗಳು.",
+    "hi": "ठीक है, आपकी complaint register हो गई है। आपका tracking ID... {sid}. एक बार फिर... {sid}. "
+          "Call करने के लिए धन्यवाद।",
+    "en": "Okay, your complaint is registered. Your tracking ID is... {sid}. Once more... {sid}. "
+          "Thank you for calling.",
     "ta": "உங்கள் complaint பதிவு செய்யப்பட்டது. Tracking ID {sid}. மீண்டும்: {sid}. நன்றி.",
     "te": "మీ complaint నమోదు అయింది. Tracking ID {sid}. మళ్ళీ: {sid}. ధన్యవాదాలు.",
 }

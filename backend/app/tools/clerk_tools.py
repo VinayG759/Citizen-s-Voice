@@ -42,6 +42,8 @@ SPECS = [
         {"type": "object", "properties": {
             "query": {"type": "string", "description": "the place or landmark, e.g. 'Presidency University'"},
             "area": {"type": "string", "description": "village or area if the caller said one, e.g. 'Rajanukunte'"},
+            "road": {"type": "string", "description": "the road the problem is ON, if the caller named one, "
+                                                     "e.g. 'Kakolu Road' — the pin is then placed on that road"},
         }, "required": ["query"]},
     ),
     ToolSpec(
@@ -88,12 +90,22 @@ SPECS = [
 ]
 
 
-def find_place(state: ToolState, query: str, area: str | None = None) -> dict:
+def find_place(state: ToolState, query: str, area: str | None = None, road: str | None = None) -> dict:
     matches = gazetteer.find(query, area)
     # "Presidency University Hostel" is part of "Presidency University": same place for a caller.
     if matches:
         top = matches[0].place.label.lower()
         matches = [matches[0]] + [m for m in matches[1:] if not m.place.label.lower().startswith(top)]
+    # "On Kakolu Road near Presidency University": the problem is on the road, so the pin goes on
+    # the road at the point nearest the landmark — not in the middle of the campus.
+    if matches and road:
+        p = matches[0].place
+        snapped = gazetteer.snap_to_road(p.lat, p.lon, road)
+        if snapped:
+            lat, lon, road_name, _ = snapped
+            on_road = gazetteer.Place(f"{p.id}@road", f"{road_name} near {p.label}", "", "road_point",
+                                      round(lat, 6), round(lon, 6), p.area)
+            matches = [gazetteer.Match(on_road, matches[0].score, None)] + matches
     for m in matches:
         state.offered.setdefault(m.place.id, OfferedPlace(m.place, state.caller_turn))
     if not matches:
@@ -194,7 +206,10 @@ def get_complaint_status(repo, tracking_id: str | None, caller_hash: str | None 
             return {"found": False, "note": "No complaint from this phone number. Ask for the tracking number."}
     else:
         return {"found": False, "note": "Ask for the tracking number, e.g. C V 1 0 4 2."}
-    return {"found": True, "tracking_id": st.tracking_id, "status": st.status, "category": st.category,
+    plain = {"open": "registered, waiting for the officer", "in_progress": "the officer is working on it",
+             "fixed": "marked as fixed", "reopened": "reopened after the citizen said it was not fixed"}
+    return {"found": True, "tracking_id": st.tracking_id, "status": plain.get(st.status, st.status),
+            "say_tracking_id_as": spoken_id(int(st.tracking_id.split("-")[1])), "category": st.category,
             "summary": st.summary_en, "place": st.place_name, "filed_on": st.created_at.date().isoformat()}
 
 
@@ -209,5 +224,7 @@ def raise_emergency(state: ToolState, reason: str) -> dict:
 
 
 def spoken_id(tracking_number: int) -> str:
-    """CV-1042 -> 'C V 1 0 4 2': read out one character at a time."""
-    return "C V " + " ".join(str(tracking_number))
+    """CV-1042 -> 'C V, 1 0, 4 2': digits read in pairs with a pause between, as people say numbers."""
+    d = str(tracking_number)
+    pairs = [d[max(0, i - 2):i] for i in range(len(d), 0, -2)][::-1]
+    return "C V, " + ", ".join(" ".join(p) for p in pairs)
