@@ -14,7 +14,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Header, HTT
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
-from app import emerging, events, officer, vision
+from app import brief, emerging, events, officer, vision
 from app.db import repo
 from app.db.models import DEPARTMENTS
 from app.settings import get_settings
@@ -93,6 +93,12 @@ def scorecard() -> list[dict]:
 def emerging_issues(headlines: bool = Query(True)) -> dict:
     """Spikes and clusters counted from recent reports, each with its evidence (app/emerging.py)."""
     return emerging.emerging(repo.reports_since, use_gemma=headlines)
+
+
+@router.get("/brief", dependencies=[Depends(officer.require_officer)])
+def morning_brief() -> dict:
+    """Today's brief for officers: numbers by code, sentences by Gemma, every number checked (app/brief.py)."""
+    return brief.morning_brief(repo.all_for_scorecard())
 
 
 # ---- officer actions -------------------------------------------------------------------------

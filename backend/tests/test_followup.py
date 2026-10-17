@@ -90,6 +90,16 @@ def states(published):
     return [e["state"] for e in published if e["type"] == "callback"]
 
 
+FINISHED = {"confirmed", "reopened", "unclear", "no_answer", "failed", "skipped"}
+
+
+def wait_until(done, seconds=10.0):
+    """The answer is recorded from a worker thread: wait for it, generously, since a busy machine is slow."""
+    deadline = time.monotonic() + seconds
+    while not done() and time.monotonic() < deadline:
+        time.sleep(0.02)
+
+
 def talk(token: str, says: str | None) -> None:
     """Vobiz answers, streams the call; the citizen hears the question and says `says` (None: silence)."""
     xml = client.post(f"/api/phone/callback/answer/{token}", data={"CallUUID": "cb-1"}).text
@@ -123,10 +133,7 @@ def ring_and_answer(setup, repo, says, gemma_says):
     assert len(posted) == 1
     token = posted[0]["json"]["answer_url"].rsplit("/", 1)[1]
     talk(token, says)
-    for _ in range(50):  # the answer is recorded from a worker thread
-        if repo.changes or repo.notes:
-            break
-        time.sleep(0.05)
+    wait_until(lambda: (repo.changes or repo.notes) and set(states(setup["published"])) & FINISHED)
     return posted[0]
 
 
@@ -332,9 +339,6 @@ def test_an_unclear_first_answer_gets_asked_once_more_in_the_same_call(setup):
         speak()    # "ಹೌದು, ಆಗಿದೆ"
         played()   # thank you
         ws.send_text(json.dumps({"event": "stop"}))
-    for _ in range(50):
-        if repo.changes:
-            break
-        time.sleep(0.05)
+    wait_until(lambda: repo.changes)
     assert said[1] == outbound.LINES["again"]["kn-IN"] and said[2] == outbound.LINES["yes"]["kn-IN"]
     assert repo.changes[0][:2] == ("fixed", "citizen")
