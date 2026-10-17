@@ -26,6 +26,19 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await response.json()) as T;
 }
 
+export async function getBlob(path: string): Promise<Blob> {
+  const token = officerToken();
+  let response: Response;
+  try {
+    response = await fetch(path, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  } catch {
+    throw new ApiError(0, "network");
+  }
+  if (response.status === 401 && token) setOfficerToken(null);
+  if (!response.ok) throw new ApiError(response.status, `HTTP ${response.status}`);
+  return response.blob();
+}
+
 export function getJson<T>(path: string): Promise<T> {
   return request<T>(path);
 }
