@@ -1,3 +1,7 @@
+STATUS: waiting for the next Sara
+
+> For the next Sara: you are the orchestrator (method in ~/.claude/CLAUDE.md). Vinay now runs sessions on Anthropic API credits, so cost per prompt grows with context: keep sessions short and hand off early. Use Sonnet for workers. Telegram webhook: Vinay ran the registration commands on 17 Oct (07:30); ask him for the --check output and the result of his first /start + voice-note test.
+
 # Handoff — Citizen's Voice, 17 Oct 2026
 
 Read this alone; it is meant to be enough. Submission is **Sun 18 Oct, 3:30 PM IST**.
