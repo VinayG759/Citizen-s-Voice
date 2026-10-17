@@ -134,6 +134,20 @@ export function urgencyLabel(c: Pick<Complaint, "urgency" | "is_emergency">): st
   return ["", "Low", "Low", "Medium", "High", "Urgent"][c.urgency] ?? "Medium";
 }
 
+/** What the Complaints and Map pages can narrow the list by. An empty string means "all". */
+export type Filters = { category: string; office: string; status: string; channel: string };
+export const FILTER_KEYS = ["category", "office", "status", "channel"] as const;
+
+/** True if the complaint passes every filter (`skip` leaves one out, to count what choosing it would show). */
+export function passes(c: Complaint, f: Partial<Filters>, skip?: keyof Filters): boolean {
+  return (
+    (skip === "category" || !f.category || c.category === f.category) &&
+    (skip === "office" || !f.office || c.department === f.office) &&
+    (skip === "status" || !f.status || c.status === f.status) &&
+    (skip === "channel" || !f.channel || c.channel === f.channel)
+  );
+}
+
 export function timeAgo(iso: string, now = Date.now()): string {
   const s = Math.max(0, Math.round((now - new Date(iso).getTime()) / 1000));
   if (s < 60) return "just now";

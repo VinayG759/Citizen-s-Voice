@@ -5,17 +5,15 @@ import "./components/components.css";
 import "./App.css";
 import "./TryPage.css";
 import "./Dashboard.css";
-import { App } from "./App";
+import "./Shell.css";
 import { ComplaintPage } from "./ComplaintPage";
+import { Shell } from "./Shell";
 import { TryPage } from "./TryPage";
 
-// Three pages, matched by address. Still too few to need a router library.
+// The citizen pages (/try, /c/…) have no sidebar and load on their own. Every other address is the
+// officer dashboard, whose pages switch without a reload (see lib/router.tsx).
 const path = window.location.pathname.replace(/\/$/, "");
 const complaintId = path.match(/^\/c\/([^/]+)$/)?.[1];
-const page = complaintId ? <ComplaintPage trackingId={decodeURIComponent(complaintId)} /> : path === "/try" ? <TryPage /> : <App />;
+const page = complaintId ? <ComplaintPage trackingId={decodeURIComponent(complaintId)} /> : path === "/try" ? <TryPage /> : <Shell />;
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    {page}
-  </StrictMode>,
-);
+createRoot(document.getElementById("root")!).render(<StrictMode>{page}</StrictMode>);

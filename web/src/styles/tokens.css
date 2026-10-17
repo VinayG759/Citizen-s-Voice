@@ -35,6 +35,7 @@
   --urgency-4: #c2410c;
   --urgency-5: #b91c1c;
 
+  --scrim: rgba(17, 24, 39, 0.45); /* dims the page behind the phone menu */
   --focus-ring: 0 0 0 3px rgba(29, 78, 216, 0.45);
 
   /* Spacing: 4px scale */

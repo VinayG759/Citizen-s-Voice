@@ -14,7 +14,7 @@ below has **not** been run end to end yet. Rehearse it on the real line before j
 | Officer passcode | Make sure `OFFICER_PASSCODE` is set on the server and you know it | "Mark fixed" needs sign-in |
 | Fix photo | Have a photo of a working streetlight (or a clean road) on the laptop desktop | The officer step uploads it |
 | Backup video | Record one full run (call → pin → mark fixed → scorecard), 2–3 min | Plan C if the network dies |
-| Tabs open | Tab 1: dashboard (`/`). Tab 2: `/try`. Tab 3: the backup video, paused at 0:00 | Switching tabs is faster than typing addresses |
+| Tabs open | Tab 1: the **Live desk** (`/`), signed in as an officer (sidebar, bottom: *Officer sign-in*; it stays signed in for that tab). Tab 2: `/try`. Tab 3: the backup video, paused at 0:00 | Switching tabs is faster than typing addresses |
 | Phones | Your phone charged, speaker tested; a second phone with a different number as backup; mobile hotspot on | The line allows 5 calls per hour per number. Don't burn them rehearsing in the last hour |
 
 **Place names checked on 17 Oct:** Jayanagar 4th Block, Hebbal, Malleswaram, Rajajinagar, Basavanagudi,
@@ -33,7 +33,7 @@ a village 40 km away; fixed 17 Oct (it now picks the suburb and also offers the 
 
 ### 0:15–1:30 — The live call, in Kannada
 
-Put your phone on speaker, held near the mic. Dial the helpline number shown at the top of the dashboard.
+Put your phone on speaker, held near the mic. Dial the helpline number shown on the Live desk (the *Live call* panel says it while it waits).
 
 1. The greeting plays in Kannada, Hindi and English. **Answer in Kannada**; that sets the language.
 2. Say: **"ನಮಸ್ಕಾರ, ಜಯನಗರ 4th Block ಅಲ್ಲಿ street light ಕೆಲಸ ಮಾಡ್ತಿಲ್ಲ, ರಾತ್ರಿ ಪೂರ್ತಿ ಕತ್ತಲು."**
@@ -43,24 +43,26 @@ Put your phone on speaker, held near the mic. Dial the helpline number shown at 
 4. It reads the complaint back once. Say **"ಹೌದು, ಸರಿ"** (yes, that's right).
 5. It says the tracking ID twice and hangs up.
 
-**While it talks, point at the screen** (tab 1): the live call panel shows each turn and Gemma's steps
+**While it talks, point at the Live desk** (tab 1): the *Live call* panel shows each turn and Gemma's steps
 as plain sentences ("Looking up 'Jayanagar 4th Block'" → "Found: …" → "Filing the complaint" →
 "Filed as CV-…") as they happen.
 
 Say once, briefly: "Sarvam is the ears and the mouth: speech to text and back. Every decision is
 Gemma's: what to ask, which place, which office, when to file."
 
-### 1:30–2:00 — The dashboard updates live
+### 1:30–2:00 — The Live desk updates live
 
-- The new complaint appears at the top of the list and as a **pin on the map**, without a refresh.
-- Click it → the complaint page: the conversation, **Gemma's steps** (what it looked up and why), the
+Stay on the Live desk: everything for this moment is on one screen.
+
+- The new complaint appears at the top of **Newest complaints** and as a **pin on the map**, without a refresh.
+- Click **Details** on it → the complaint page: the conversation, **Gemma's steps** (what it looked up and why), the
   office it was sent to (BBMP), its deadline (7 days) and the timeline.
 - Say: "The map pin comes from OpenStreetMap data, never from the model. Gemma can't invent a place,
   and it can't file until the caller says yes."
 
 ### 2:00–2:35 — The officer closes the loop with a photo
 
-1. On the new complaint's page: **Officer sign-in** (header) → passcode. An **Officer actions** card appears.
+1. On the new complaint's page: if you are not already signed in, **Officer sign-in** (header) → passcode. An **Officer actions** card appears.
 2. **Start work** → then **Choose photo** (the fix photo) → **Mark fixed**.
 3. **Gemma 4 31B looks at the photo** against the complaint and shows its verdict: looks fixed / not
    fixed / can't tell, with one sentence of reasoning. Takes a few seconds.
@@ -69,8 +71,8 @@ Gemma's: what to ask, which place, which office, when to file."
 
 ### 2:35–2:55 — The scorecard
 
-- Scroll to the **office scorecard**: per office, filed / open / fixed / **overdue** / median days to fix.
-- Back on the dashboard, switch the list to **"Most urgent first"**: each complaint shows *why* it ranks there ("urgency 4 · 4 reports ·
+- Go back (browser *Back*), click **Offices** in the sidebar: the scorecard, per office: filed / open / fixed / **overdue** / median days to fix.
+- Click **Complaints** in the sidebar, then **"Most urgent first"**: each complaint shows *why* it ranks there ("urgency 4 · 4 reports ·
   overdue by 3 days"). "Plain rules, shown openly. The AI doesn't decide who waits."
 
 ### 2:55–3:00 — Close
@@ -80,7 +82,11 @@ Gemma's: what to ask, which place, which office, when to file."
 
 ---
 
-## Optional extra (if a judge asks about duplicates)
+## Optional extras
+
+**If a judge asks "what is trending?":** click **Emerging issues** in the sidebar (spikes and clusters, each with its evidence). Opening it asks Gemma for the headlines (the server remembers them), so open it once before the demo to make it instant; inside one tab it only reloads when you press *Refresh*. **Morning brief** (officers only) gives today's numbers and a *Download CSV* button.
+
+**If a judge asks about duplicates:**
 
 On `/try`, type or say: **"ಜಯನಗರ 4th Block ಅಲ್ಲಿ ಮೂರು ದಿನದಿಂದ ನೀರು ಬರ್ತಿಲ್ಲ"** (no water in Jayanagar 4th
 Block for three days). The sample data already has that complaint, so the clerk should say it was
