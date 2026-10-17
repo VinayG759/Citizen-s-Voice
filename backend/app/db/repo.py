@@ -216,6 +216,30 @@ def reroute(tracking_number: int, department: str, note: str | None = None) -> d
         return public_complaint(c, officer=True)
 
 
+def add_note(tracking_number: int, note: str) -> bool:
+    """A line in the timeline that keeps the current status (e.g. "call-back: no answer")."""
+    with Session(get_engine()) as s, s.begin():
+        c = s.scalar(select(Complaint).where(Complaint.tracking_number == tracking_number))
+        if c is None:
+            return False
+        s.add(StatusChange(complaint_id=c.id, status=c.status, changed_by="system", note=note[:500]))
+        return True
+
+
+def reports_since(since: datetime) -> list[dict]:
+    """Every report filed since `since` (linked reports too: each is one more person), sensitive
+    reports left out. `tracking_id` is the ORIGINAL complaint's, so evidence points at real complaints."""
+    with Session(get_engine()) as s:
+        rows = s.scalars(select(Complaint).where(Complaint.created_at >= since, Complaint.sensitive.is_(False))).all()
+        parents = {c.id: c.tracking_id for c in rows}
+        missing = {c.duplicate_of for c in rows if c.duplicate_of and c.duplicate_of not in parents}
+        if missing:
+            parents.update({c.id: c.tracking_id for c in s.scalars(select(Complaint).where(Complaint.id.in_(missing)))})
+        return [{"tracking_id": parents.get(c.duplicate_of, c.tracking_id) if c.duplicate_of else c.tracking_id,
+                 "category": c.category, "lat": c.lat, "lon": c.lon, "place_name": c.place_name,
+                 "created_at": c.created_at} for c in rows]
+
+
 def add_photo(tracking_number: int, kind: str, mime: str, data: bytes, verdict: dict | None) -> int | None:
     with Session(get_engine()) as s, s.begin():
         c = s.scalar(select(Complaint).where(Complaint.tracking_number == tracking_number))

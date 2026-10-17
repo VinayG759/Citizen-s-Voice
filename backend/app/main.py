@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import events
-from app.api import complaints, phone, try_it
+from app.api import callback, complaints, phone, try_it
 from app.db.session import database_is_up
 from app.phone.call import warm_clips
 from app.settings import get_settings
@@ -62,6 +62,7 @@ def public_config() -> dict:
 
 app.include_router(try_it.router)
 app.include_router(phone.router)
+app.include_router(callback.router)
 app.include_router(complaints.router)
 
 # API routers are included ABOVE this line: the dashboard catch-all below must
