@@ -45,8 +45,9 @@ _greeting_audio: str | None = None
 
 
 def _client_ip(request: Request) -> str:
-    # On DigitalOcean the load balancer sets this; visitors' own X-Forwarded-For is ignored.
-    return request.headers.get("do-connecting-ip") or (request.client.host if request.client else "unknown")
+    # On Railway every request comes from its proxy, which overwrites X-Real-IP with the visitor's address
+    # (a visitor's own copy is replaced). Without it (the laptop) the connection's address is used.
+    return request.headers.get("x-real-ip") or (request.client.host if request.client else "unknown")
 
 
 def _rate_limited(ip: str) -> bool:

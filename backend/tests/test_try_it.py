@@ -81,6 +81,16 @@ def test_one_visitor_cannot_flood_gemma():
     assert codes[-1] == 429 and set(codes[:-1]) == {200}
 
 
+def test_visitors_behind_railways_proxy_are_counted_separately():
+    """On Railway every request arrives from the proxy; X-Real-IP (set by Railway's edge) tells visitors apart."""
+    sid = start()
+    for _ in range(try_it.RATE_LIMIT_TURNS):
+        client.post("/api/try/turn", data={"session_id": sid, "text": "hello"}, headers={"X-Real-IP": "203.0.113.1"})
+    one = client.post("/api/try/turn", data={"session_id": sid, "text": "hello"}, headers={"X-Real-IP": "203.0.113.1"})
+    other = client.post("/api/try/turn", data={"session_id": sid, "text": "hello"}, headers={"X-Real-IP": "203.0.113.2"})
+    assert (one.status_code, other.status_code) == (429, 200)
+
+
 def test_greeting_is_spoken_once_and_reused(monkeypatch):
     calls = []
     monkeypatch.setattr(try_it.sarvam, "speak", lambda t, l: calls.append((t, l)) or (TINY_WAV, 1))

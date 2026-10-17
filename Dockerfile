@@ -26,6 +26,5 @@ EXPOSE 8080
 # Apply any new database migrations, then start the server.
 # No --proxy-headers / --forwarded-allow-ips: trusting X-Forwarded-For from anyone
 # would let a visitor fake their IP. Where we need the client IP (rate limits), we
-# read a header the host's load balancer sets and visitors cannot forge. (Railway does not send
-# DigitalOcean's "do-connecting-ip": see docs/deploy-readiness.md, blocker 2.)
+# read X-Real-IP, which Railway's proxy overwrites on every request (app/api/try_it.py).
 CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}"]
