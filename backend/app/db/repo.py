@@ -1,5 +1,6 @@
 """Database reads and writes the features need. Plain functions; one short transaction each."""
 
+import logging
 import math
 from dataclasses import dataclass
 from datetime import datetime
@@ -9,6 +10,8 @@ from sqlalchemy.orm import Session
 
 from app.db.models import Call, ClerkEvent, Complaint, Photo, StatusChange, Turn
 from app.db.session import get_engine
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -271,3 +274,15 @@ def all_for_scorecard() -> list[dict]:
             d["fixed_at"] = fixed_at.isoformat() if fixed_at else None
             out.append(d)
         return out
+
+
+def save_turn(conv, caller_text: str, stt_ms: int, result) -> None:
+    """One turn of a conversation, saved after the reply has gone (try-it page and chat apps)."""
+    try:  # saving history must never cost the visitor their reply
+        conv.repo.add_turn(conv.call_id, "caller", caller_text, result.language, stt_ms=stt_ms or None)
+        conv.repo.add_turn(conv.call_id, "clerk", result.reply, result.language, llm_ms=result.llm_ms)
+        conv.repo.add_events(conv.call_id, result.events)
+        if result.complaint:
+            conv.repo.end_call(conv.call_id, "filed", conv.state.filed.id)
+    except Exception:
+        log.exception("could not save turn")

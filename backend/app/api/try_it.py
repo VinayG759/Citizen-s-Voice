@@ -9,7 +9,6 @@ import base64
 import hashlib
 import hmac
 import logging
-import re
 import threading
 import time
 import uuid
@@ -19,9 +18,9 @@ from fastapi.responses import Response
 
 from app import events
 from app.clerk.clerk import Conversation
-from app.clerk.language import written_in
+from app.clerk.language import guess_language, written_in
 from app.phone.call import GREETING as GREETING_PARTS, greeting_text
-from app.db.repo import Repo
+from app.db.repo import Repo, save_turn
 from app.settings import get_settings
 from app.speech import sarvam
 
@@ -138,7 +137,7 @@ def turn(
         caller_text, language, stt_ms = heard.text, heard.language, heard.ms
     else:
         caller_text = (text or "").strip()[:1000]
-        language = _guess_language(caller_text)
+        language = guess_language(caller_text)
     if not caller_text:
         raise HTTPException(422, "nothing heard")
 
@@ -146,7 +145,7 @@ def turn(
     with _lock:
         _sessions[session_id] = (conv, time.time())
     # The reply goes back now; its voice is fetched separately (/speak) and history is saved after.
-    background.add_task(_save, conv, caller_text, stt_ms, result)
+    background.add_task(save_turn, conv, caller_text, stt_ms, result)
 
     return {
         "caller_text": caller_text,
@@ -184,25 +183,3 @@ def speak(session_id: str = Form(...)) -> Response:
         log.warning("tts failed: %s", e)
         raise HTTPException(502, "could not speak") from e
     return Response(audio, media_type="audio/wav", headers={"X-TTS-Ms": str(ms), "Cache-Control": "no-store"})
-
-
-def _save(conv: Conversation, caller_text: str, stt_ms: int, result) -> None:
-    try:  # saving history must never cost the visitor their reply
-        conv.repo.add_turn(conv.call_id, "caller", caller_text, result.language, stt_ms=stt_ms or None)
-        conv.repo.add_turn(conv.call_id, "clerk", result.reply, result.language, llm_ms=result.llm_ms)
-        conv.repo.add_events(conv.call_id, result.events)
-        if result.complaint:
-            conv.repo.end_call(conv.call_id, "filed", conv.state.filed.id)
-    except Exception:
-        log.exception("could not save turn")
-
-
-def _guess_language(text: str) -> str | None:
-    """Typed text has no speech detector: judge by script. None keeps the current language."""
-    if re.search(r"[ಀ-೿]", text):
-        return "kn-IN"
-    if re.search(r"[ऀ-ॿ]", text):
-        return "hi-IN"
-    if re.search(r"[A-Za-z]{3,}", text):
-        return "en-IN"
-    return None

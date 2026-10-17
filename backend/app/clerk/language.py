@@ -90,3 +90,14 @@ def written_in(text: str, default: str) -> str:
     if counts[best]:
         return best  # Indian script present: that language (English words inside are normal)
     return "en-IN" if latin else default
+
+
+def guess_language(text: str) -> str | None:
+    """Typed text has no speech detector: judge by script. None keeps the current language."""
+    if re.search(r"[ಀ-೿]", text):
+        return "kn-IN"
+    if re.search(r"[ऀ-ॿ]", text):
+        return "hi-IN"
+    if re.search(r"[A-Za-z]{3,}", text):
+        return "en-IN"
+    return None

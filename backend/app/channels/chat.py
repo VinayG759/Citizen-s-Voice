@@ -18,11 +18,11 @@ from dataclasses import dataclass, field
 from typing import Protocol
 
 from app import contact, events, vision
-from app.api.try_it import _guess_language, _save
 from app.clerk.clerk import Conversation
+from app.clerk.language import guess_language
 from app.db import repo as db
 from app.db.models import CATEGORIES
-from app.db.repo import Repo
+from app.db.repo import Repo, save_turn
 from app.places import gazetteer
 from app.settings import get_settings
 from app.speech import sarvam
@@ -49,6 +49,9 @@ HOW_TO = ("ದಯವಿಟ್ಟು text, voice message, photo ಅಥವಾ loca
           "Please send text, a voice note, a photo or your location.")
 PHOTO_ADDED = ("ನಿಮ್ಮ photo {tid} complaint ಗೆ ಸೇರಿಸಲಾಗಿದೆ. / Your photo was added to complaint {tid}. "
                "If it shows a different problem, tell me about it.")
+TOO_LONG = ("ದಯವಿಟ್ಟು 30 seconds ಒಳಗಿನ voice message ಕಳಿಸಿ. / "
+            "Please keep voice notes under 30 seconds.")
+COULD_NOT_FETCH = "ಕ್ಷಮಿಸಿ, ಅದನ್ನು ತೆರೆಯಲು ಆಗಲಿಲ್ಲ. / Sorry, I couldn't open that. Could you send it again?"
 
 
 @dataclass
@@ -113,7 +116,7 @@ class ChatClerk:
                 return
             words, language, stt_ms, by_voice = heard.text, heard.language, heard.ms, True
         elif words:
-            language = _guess_language(words)
+            language = guess_language(words)
 
         if not (words or msg.photo or msg.location):  # a sticker, a file, a contact card…
             out.send_text(chat_id, HOW_TO)
@@ -142,7 +145,7 @@ class ChatClerk:
             voice = self._voice(result.reply, result.language)
             if voice:
                 out.send_voice(chat_id, *voice)
-        _save(conv, caller_text, stt_ms, result)
+        save_turn(conv, caller_text, stt_ms, result)
 
         if result.complaint:
             number = conv.state.filed.tracking_number
