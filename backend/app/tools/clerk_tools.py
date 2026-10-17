@@ -181,14 +181,16 @@ def file_complaint(state: ToolState, repo, session_info: dict, **a) -> dict:
         contact_enc=None if sensitive else session_info.get("contact_enc"),
         channel=session_info.get("channel", "web"),
     )
+    # A sensitive report: the call record forgets who called as well (not only the complaint).
+    forget = {"forget_call": session_info["call_id"]} if sensitive and session_info.get("call_id") else {}
     if same_as:
         # Same problem: one tracking ID for everyone; the original gets this report counted.
-        filed, count, raised = repo.add_report(state.nearby_seen[same_as], **fields)
+        filed, count, raised = repo.add_report(state.nearby_seen[same_as], **forget, **fields)
         state.filed, state.report_count = filed, count
         return {"ok": True, "added_to_existing": True, "tracking_id": filed.tracking_id,
                 "say_tracking_id_as": spoken_id(filed.tracking_number), "you_are_reporter_number": count,
                 "priority_raised": raised, "place": p.label}
-    filed = repo.file_complaint(**fields)
+    filed = repo.file_complaint(**forget, **fields)
     state.filed = filed
     return {"ok": True, "tracking_id": filed.tracking_id, "say_tracking_id_as": spoken_id(filed.tracking_number),
             "place": p.label, "sent_to": department}

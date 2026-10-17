@@ -99,3 +99,28 @@ def test_the_caller_hears_they_are_the_fourth_reporter(monkeypatch):
     result = conv.turn("Yes, that's right")
     assert "person number 4" in result.reply and "C V, 1 0, 4 2" in result.reply
     assert result.complaint == {"tracking_id": "CV-1042"}
+
+
+def test_a_sensitive_report_also_makes_the_call_record_forget_the_caller():
+    info = {"caller_hash": "h" * 64, "caller_last4": "1234", "channel": "phone", "call_id": 77}
+    common = dict(summary_en="Someone demanded a bribe", place_id=PRESIDENCY, caller_confirmed=True)
+    repo = Repo()
+    clerk_tools.file_complaint(ready_state(), repo, info, category="corruption", **common)
+    fields = repo.filed[0]
+    assert fields["forget_call"] == 77 and fields["caller_hash"] is None and fields["caller_last4"] is None
+
+    repo = Repo()
+    clerk_tools.file_complaint(ready_state(), repo, info, category="road", **common)
+    assert "forget_call" not in repo.filed[0] and repo.filed[0]["caller_hash"] == "h" * 64
+
+
+def test_forgetting_the_caller_blanks_the_call_rows_hash():
+    from types import SimpleNamespace
+
+    from app.db import repo as repo_mod
+
+    call = SimpleNamespace(caller_hash="h" * 64)
+    session = SimpleNamespace(get=lambda model, i: call if i == 77 else None)
+    repo_mod._forget_caller(session, 77)
+    assert call.caller_hash is None
+    repo_mod._forget_caller(session, None)  # nothing to forget: no lookup, no error

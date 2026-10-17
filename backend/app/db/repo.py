@@ -64,8 +64,10 @@ class Repo:
         with Session(get_engine()) as s, s.begin():
             s.add_all(ClerkEvent(call_id=call_id, kind=e["kind"], payload=e) for e in events)
 
-    def file_complaint(self, **fields) -> FiledComplaint:
+    def file_complaint(self, forget_call: int | None = None, **fields) -> FiledComplaint:
+        """forget_call: a sensitive report — the call it came from stops recording who called, too."""
         with Session(get_engine()) as s, s.begin():
+            _forget_caller(s, forget_call)
             c = Complaint(**fields)
             s.add(c)
             s.flush()
@@ -91,7 +93,8 @@ class Repo:
                                 "metres_away": round(m), "filed_on": c.created_at.date().isoformat()})
             return sorted(out, key=lambda x: x["metres_away"])
 
-    def add_report(self, parent_tracking_number: int, **fields) -> tuple[FiledComplaint, int, bool]:
+    def add_report(self, parent_tracking_number: int, forget_call: int | None = None,
+                   **fields) -> tuple[FiledComplaint, int, bool]:
         """Record another person's report of an existing problem.
 
         Stores the new report linked to the original, bumps the original's report count, and
@@ -103,6 +106,7 @@ class Repo:
                               .with_for_update())
             if parent is None:
                 raise LookupError(parent_tracking_number)
+            _forget_caller(s, forget_call)
             s.add(Complaint(duplicate_of=parent.id, **fields))
             parent.report_count += 1
             raised = parent.report_count % 3 == 0 and parent.urgency < 5
@@ -128,6 +132,11 @@ class Repo:
             if not c:
                 return None
             return ComplaintStatus(c.tracking_id, c.status, c.category, c.summary_en, c.place_name, c.created_at)
+
+
+def _forget_caller(s: Session, call_id: int | None) -> None:
+    if call_id is not None and (call := s.get(Call, call_id)) is not None:
+        call.caller_hash = None
 
 
 def _metres(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
