@@ -1,9 +1,22 @@
 import {
+  Banknote,
+  Building2,
+  Bus,
   CircleAlert,
   Construction,
+  Dog,
   Droplets,
+  Factory,
+  GraduationCap,
+  HeartPulse,
   Lightbulb,
+  ShieldAlert,
+  ShoppingBasket,
+  Siren,
   Trash2,
+  TrafficCone,
+  TreePine,
+  Volume2,
   Waves,
   Zap,
   type LucideIcon,
@@ -26,12 +39,31 @@ export type Complaint = {
   lon: number | null;
   since_when: string | null;
   report_count: number;
-  channel: "phone" | "web" | "whatsapp";
+  channel: "phone" | "web" | "whatsapp" | "telegram";
   caller_last4: string | null;
   created_at: string;
+  department: string;
+  sensitive: boolean;
+  // what happens next (computed by the server, rules not AI)
+  office: string;
+  deadline_days: number;
+  overdue: boolean;
+  escalated: boolean;
+  priority: number;
+  priority_why: string;
+};
+
+export type TimelineEntry = { status: Complaint["status"]; by: "officer" | "citizen" | "system"; note: string | null; at: string };
+export type PhotoMeta = {
+  id: number;
+  kind: "citizen" | "fix";
+  verdict: { looks_fixed?: "yes" | "no" | "unclear"; reason?: string; what_i_see?: string } | null;
+  at: string;
 };
 
 export type ComplaintDetail = Complaint & {
+  timeline: TimelineEntry[];
+  photos: PhotoMeta[];
   transcript: { speaker: "caller" | "clerk"; text: string; language: string | null; at: string }[];
   steps: ClerkEvent[];
 };
@@ -44,7 +76,45 @@ export const CATEGORY: Record<string, { label: string; icon: LucideIcon }> = {
   garbage: { label: "Garbage", icon: Trash2 },
   drainage: { label: "Drainage", icon: Waves },
   streetlight: { label: "Streetlight", icon: Lightbulb },
+  trees: { label: "Trees", icon: TreePine },
+  animals: { label: "Animals", icon: Dog },
+  noise: { label: "Noise", icon: Volume2 },
+  pollution: { label: "Pollution", icon: Factory },
+  traffic: { label: "Traffic", icon: TrafficCone },
+  transport: { label: "Buses", icon: Bus },
+  health: { label: "Health", icon: HeartPulse },
+  education: { label: "Schools", icon: GraduationCap },
+  ration: { label: "Ration shop", icon: ShoppingBasket },
+  pension: { label: "Pension", icon: Banknote },
+  safety: { label: "Safety", icon: ShieldAlert },
+  building: { label: "Building", icon: Building2 },
+  corruption: { label: "Corruption", icon: Siren },
   other: { label: "Other", icon: CircleAlert },
+};
+
+/** Offices a complaint can be sent to — same names as the server (app/officer.py). */
+export const OFFICES: Record<string, string> = {
+  bbmp: "BBMP (city corporation)",
+  bescom: "BESCOM (electricity)",
+  bwssb: "BWSSB (water)",
+  bmtc: "BMTC (buses)",
+  traffic_police: "Traffic Police",
+  police: "Police (non-emergency)",
+  health: "Health Department",
+  education: "Education Department",
+  food_civil_supplies: "Food & Civil Supplies (ration shops)",
+  revenue: "Revenue (pensions, certificates)",
+  pollution_board: "Pollution Control Board",
+  panchayat: "Gram Panchayat",
+  lokayukta: "Lokayukta (corruption)",
+  unrouted: "Not yet routed",
+};
+
+export const CHANNEL_LABEL: Record<Complaint["channel"], string> = {
+  phone: "Phone call",
+  web: "Browser",
+  whatsapp: "WhatsApp",
+  telegram: "Telegram",
 };
 
 export const STATUS_LABEL: Record<Complaint["status"], string> = {

@@ -162,3 +162,45 @@
   padding: var(--space-1);
   display: inline-flex;
 }
+
+/* Dialog (officer sign-in) */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 2000; /* above the map */
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: rgb(0 0 0 / 0.45);
+}
+
+.modal__box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: min(360px, 100%);
+  padding: var(--space-5);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal__head h2 {
+  font-size: var(--text-lg);
+}
+
+.field__label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-strong);
+}
+
+.field__error {
+  font-size: var(--text-sm);
+  color: var(--danger);
+}

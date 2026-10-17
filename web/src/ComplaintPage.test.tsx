@@ -1,0 +1,92 @@
+import { fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, vi } from "vitest";
+import { ComplaintPage } from "./ComplaintPage";
+import { setOfficerToken } from "./lib/officer";
+
+vi.mock("./components/ComplaintMap", () => ({ ComplaintMap: () => <div data-testid="map" /> }));
+
+const DETAIL = {
+  tracking_id: "CV-1004", status: "open", category: "road", summary_en: "Potholes in front of St. Mary's School",
+  summary_local: null, language: "kn-IN", urgency: 3, is_emergency: false, is_incomplete: false,
+  place_name: "St. Mary's School", landmark: null, lat: 13.04, lon: 77.51, since_when: "5 years",
+  report_count: 1, channel: "telegram", caller_last4: null, created_at: "2026-10-10T10:00:00+00:00",
+  department: "bbmp", sensitive: false, office: "BBMP (city corporation)", deadline_days: 7, overdue: true,
+  escalated: true, priority: 60, priority_why: "urgency 3 · open 7 days · overdue by 1 day",
+  timeline: [
+    { status: "open", by: "system", note: null, at: "2026-10-10T10:00:00+00:00" },
+    { status: "in_progress", by: "officer", note: "Crew sent", at: "2026-10-11T10:00:00+00:00" },
+  ],
+  photos: [{ id: 9, kind: "fix", verdict: { looks_fixed: "no", reason: "The pothole is still visible" }, at: "2026-10-12T10:00:00+00:00" }],
+  transcript: [], steps: [],
+};
+
+const calls: { path: string; init?: RequestInit }[] = [];
+
+function mockFetch(routes: Record<string, unknown>) {
+  calls.length = 0;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (path: string, init?: RequestInit) => {
+      calls.push({ path, init });
+      const body = routes[path];
+      if (body === undefined) return new Response("{}", { status: 404 });
+      return new Response(JSON.stringify(body), { status: body === "denied" ? 401 : 200 });
+    }),
+  );
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  setOfficerToken(null);
+});
+
+test("anyone can see where a complaint is: office, deadline, timeline and Gemma's photo check", async () => {
+  mockFetch({ "/api/complaints/CV-1004": DETAIL });
+  render(<ComplaintPage trackingId="CV-1004" />);
+  expect(await screen.findByText("BBMP (city corporation)")).toBeInTheDocument();
+  expect(screen.getByText("Overdue · escalated")).toBeInTheDocument();
+  expect(screen.getByText(/7 days from filing — overdue/)).toBeInTheDocument();
+  expect(screen.getByText("Crew sent")).toBeInTheDocument();
+  expect(screen.getByText("Gemma: not fixed")).toBeInTheDocument();
+  expect(screen.getByText(/^Telegram/)).toBeInTheDocument();
+  expect(screen.queryByText("Officer actions")).not.toBeInTheDocument();
+});
+
+test("a sensitive report hides the conversation from the public", async () => {
+  mockFetch({ "/api/complaints/CV-1004": { ...DETAIL, sensitive: true } });
+  render(<ComplaintPage trackingId="CV-1004" />);
+  expect(await screen.findByText(/visible only to officers/)).toBeInTheDocument();
+});
+
+test("an officer signs in, sees the actions, and the token goes with each request", async () => {
+  mockFetch({ "/api/complaints/CV-1004": DETAIL, "/api/officer/login": { token: "123.abc" }, "/api/complaints/CV-1004/status": DETAIL });
+  render(<ComplaintPage trackingId="CV-1004" />);
+  fireEvent.click(await screen.findByRole("button", { name: /Officer sign-in/ }));
+  fireEvent.change(screen.getByLabelText("Passcode"), { target: { value: "secret" } });
+  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+  expect(await screen.findByText("Officer actions")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /Start work/ }));
+  await screen.findByText("Marked in progress.");
+  const sent = calls.find((c) => c.path === "/api/complaints/CV-1004/status");
+  expect((sent?.init?.headers as Record<string, string>).Authorization).toBe("Bearer 123.abc");
+  expect(JSON.parse(String(sent?.init?.body))).toEqual({ status: "in_progress", note: null });
+});
+
+test("marking fixed without a photo is stopped before anything is sent", async () => {
+  setOfficerToken("123.abc");
+  mockFetch({ "/api/complaints/CV-1004": DETAIL });
+  render(<ComplaintPage trackingId="CV-1004" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Mark fixed" }));
+  expect(await screen.findByText("Add a photo of the fixed problem first.")).toBeInTheDocument();
+  expect(calls.some((c) => c.path.endsWith("/fixed"))).toBe(false);
+});
+
+test("a wrong passcode says so and stays signed out", async () => {
+  mockFetch({ "/api/complaints/CV-1004": DETAIL, "/api/officer/login": "denied" });
+  render(<ComplaintPage trackingId="CV-1004" />);
+  fireEvent.click(await screen.findByRole("button", { name: /Officer sign-in/ }));
+  fireEvent.change(screen.getByLabelText("Passcode"), { target: { value: "wrong" } });
+  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+  expect(await screen.findByText("That passcode is wrong.")).toHaveAttribute("role", "alert");
+  expect(screen.queryByText("Officer actions")).not.toBeInTheDocument();
+});
