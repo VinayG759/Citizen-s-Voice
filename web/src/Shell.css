@@ -218,6 +218,7 @@
 
 .emerging__top {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
   margin-bottom: var(--space-2);
@@ -438,6 +439,13 @@
   .mapview__map {
     height: 70vh;
     min-height: 360px;
+  }
+}
+
+/* Phones: the four filters two to a row, not one half-width box per line. */
+@media (max-width: 600px) {
+  .filters__select {
+    flex: 1 1 140px;
   }
 }
 
