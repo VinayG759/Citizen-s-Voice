@@ -41,6 +41,11 @@ GATE_HOSTS = {"college", "university", "school", "hospital", "park", "stadium", 
 ROAD_TYPES = "motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street"
 MAIN_ROADS = {"motorway", "trunk", "primary", "secondary", "tertiary"}
 GATE_RADIUS_M = 40  # a gate this close to an outline belongs to it
+# Street furniture nobody gives directions by; a clock named "Brigade" beat Brigade Road (17 Oct).
+NOT_LANDMARKS = {"clock", "bench", "waste_basket", "waste_disposal", "vending_machine", "drinking_water",
+                 "water_point", "toilets", "shower", "bicycle_parking", "motorcycle_parking", "parking_space",
+                 "parking_entrance", "post_box", "telephone", "charging_station", "grit_bin", "shelter",
+                 "fixme", "construction", "yes", "no", "roof", "hut", "shed", "garage", "garages"}
 
 
 def query(bbox: str) -> str:
@@ -78,6 +83,29 @@ out geom tags;
 """
 
 
+def landmark_query(bbox: str) -> str:
+    # Everything else people name a place by: "near Axis Bank", "opposite Mayura Bakery", "behind
+    # Prestige apartments". Tester's report, 17 Oct: OpenStreetMap had 372 named things around
+    # T. Dasarahalli; the queries above kept only a fraction of them.
+    return f"""
+[out:json][timeout:180];
+(
+  nwr["amenity"]["name"]({bbox});
+  nwr["shop"]["name"]({bbox});
+  nwr["office"]["name"]({bbox});
+  nwr["tourism"]["name"]({bbox});
+  nwr["healthcare"]["name"]({bbox});
+  nwr["leisure"]["name"]({bbox});
+  nwr["building"]["name"]({bbox});
+  nwr["landuse"="residential"]["name"]({bbox});
+);
+out center tags;
+"""
+
+
+QUERIES = {"main": query, "outlines": outline_query, "landmarks": landmark_query}
+
+
 def fetch(bbox: str, kind: str = "main") -> list[dict]:
     cached = CACHE / (("" if kind == "main" else kind + "-") + bbox.replace(",", "_") + ".json.gz")
     if cached.exists():
@@ -86,7 +114,7 @@ def fetch(bbox: str, kind: str = "main") -> list[dict]:
     for attempt in range(4):
         for server in SERVERS:
             try:
-                q = query(bbox) if kind == "main" else outline_query(bbox)
+                q = QUERIES[kind](bbox)
                 r = httpx.post(server, data={"data": q}, headers=AGENT, timeout=240)
                 r.raise_for_status()
                 elements = r.json()["elements"]
@@ -102,9 +130,10 @@ def fetch(bbox: str, kind: str = "main") -> list[dict]:
 
 
 def kind_of(tags: dict) -> str:
-    for key in ("place", "amenity", "railway", "leisure", "shop", "water", "natural"):
+    for key in ("place", "amenity", "railway", "leisure", "shop", "water", "natural", "office", "tourism",
+                "healthcare", "building", "landuse"):
         if key in tags:
-            return tags[key]
+            return "building" if tags[key] == "yes" else tags[key]  # building=yes: just "a building"
     if tags.get("highway") == "bus_stop":
         return "bus_stop"
     if "highway" in tags:
@@ -167,7 +196,7 @@ def main() -> None:
         for j in range(TILES):
             bbox = f"{SOUTH + i * dlat:.4f},{WEST + j * dlon:.4f},{SOUTH + (i + 1) * dlat:.4f},{WEST + (j + 1) * dlon:.4f}"
             print(f"tile {i * TILES + j + 1}/{TILES * TILES} {bbox}", file=sys.stderr)
-            for el in fetch(bbox) + fetch(bbox, "outlines"):
+            for el in fetch(bbox) + fetch(bbox, "outlines") + fetch(bbox, "landmarks"):
                 key = f"{el['type']}{el['id']}"
                 # the same way can come back twice (centre and geometry): keep both views
                 merged = elements.setdefault(key, {})
@@ -186,6 +215,8 @@ def main() -> None:
         if not (en or kn):
             continue
         kind = kind_of(tags)
+        if kind in NOT_LANDMARKS:
+            continue
         if kind == "road" and geom:
             roads[(en, kn)].append({"type": tags.get("highway", ""), "pts": simplify(geom)})
         if kind in GATE_HOSTS and len(geom) >= 3:
