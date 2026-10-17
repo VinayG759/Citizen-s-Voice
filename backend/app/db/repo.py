@@ -7,7 +7,7 @@ from datetime import datetime
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Call, ClerkEvent, Complaint, Turn
+from app.db.models import Call, ClerkEvent, Complaint, Photo, StatusChange, Turn
 from app.db.session import get_engine
 
 
@@ -66,6 +66,7 @@ class Repo:
             c = Complaint(**fields)
             s.add(c)
             s.flush()
+            s.add(StatusChange(complaint_id=c.id, status="open", changed_by="system", note="filed"))
             s.refresh(c)
             return FiledComplaint(c.id, c.tracking_number)
 
@@ -133,11 +134,18 @@ def _metres(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * r * math.asin(math.sqrt(a))
 
 
-def public_complaint(c: Complaint) -> dict:
-    """What the public dashboard may show. Never a phone number or caller hash — only the last 4 digits."""
+SENSITIVE_SUMMARY = "A sensitive report — details are visible to officers only."
+
+
+def public_complaint(c: Complaint, officer: bool = False) -> dict:
+    """What the dashboard may show. Never a phone number, caller hash or contact — only the last 4 digits.
+    Sensitive reports (harassment, violence, corruption) show their details to officers only."""
+    hide = c.sensitive and not officer
     return {
         "tracking_id": c.tracking_id, "status": c.status, "category": c.category,
-        "summary_en": c.summary_en, "summary_local": c.summary_local, "language": c.language,
+        "department": c.department, "sensitive": c.sensitive,
+        "summary_en": SENSITIVE_SUMMARY if hide else c.summary_en,
+        "summary_local": None if hide else c.summary_local, "language": c.language,
         "urgency": c.urgency, "is_emergency": c.is_emergency, "is_incomplete": c.is_incomplete,
         "place_name": c.place_name, "landmark": c.landmark, "lat": c.lat, "lon": c.lon,
         "since_when": c.since_when, "report_count": c.report_count, "channel": c.channel,
@@ -145,27 +153,121 @@ def public_complaint(c: Complaint) -> dict:
     }
 
 
-def list_complaints(limit: int = 200) -> list[dict]:
+def list_complaints(limit: int = 200, officer: bool = False, department: str | None = None) -> list[dict]:
     with Session(get_engine()) as s:
-        rows = s.scalars(select(Complaint).where(Complaint.duplicate_of.is_(None))
-                         .order_by(desc(Complaint.created_at)).limit(limit)).all()
-        return [public_complaint(c) for c in rows]
+        q = select(Complaint).where(Complaint.duplicate_of.is_(None))
+        if department:
+            q = q.where(Complaint.department == department)
+        rows = s.scalars(q.order_by(desc(Complaint.created_at)).limit(limit)).all()
+        return [public_complaint(c, officer) for c in rows]
 
 
-def complaint_detail(tracking_number: int) -> dict | None:
-    """The complaint, plus the conversation that produced it and every step Gemma took."""
+def complaint_detail(tracking_number: int, officer: bool = False, show_conversation: bool = True) -> dict | None:
+    """The complaint, its timeline and photos, plus the conversation that produced it and every step
+    Gemma took (conversation hidden for sensitive reports unless an officer is asking)."""
     with Session(get_engine()) as s:
         c = s.scalar(select(Complaint).where(Complaint.tracking_number == tracking_number))
         if c is None:
             return None
-        out = public_complaint(c)
+        out = public_complaint(c, officer)
+        out["timeline"] = timeline(s, c.id)
+        out["photos"] = photos_meta(s, c.id)
         call = s.scalar(select(Call).where(Call.complaint_id == c.id))
         out["transcript"], out["steps"] = [], []
-        if call is not None:
+        if call is not None and (officer or (show_conversation and not c.sensitive)):
             out["transcript"] = [
                 {"speaker": t.speaker, "text": t.text_local, "language": t.language, "at": t.created_at.isoformat()}
                 for t in s.scalars(select(Turn).where(Turn.call_id == call.id).order_by(Turn.id))
             ]
             out["steps"] = [e.payload for e in s.scalars(
                 select(ClerkEvent).where(ClerkEvent.call_id == call.id).order_by(ClerkEvent.id))]
+        return out
+
+
+# ---- after filing: what happens next ---------------------------------------------------------
+
+def change_status(tracking_number: int, status: str, changed_by: str, note: str | None = None) -> dict | None:
+    """Move a complaint along (open → in_progress → fixed → reopened …) and record it in the timeline.
+    When a citizen confirms the fix, the encrypted contact is deleted: it is no longer needed."""
+    with Session(get_engine()) as s, s.begin():
+        c = s.scalar(select(Complaint).where(Complaint.tracking_number == tracking_number).with_for_update())
+        if c is None:
+            return None
+        c.status = status
+        if status == "reopened":
+            c.urgency = min(5, c.urgency + 1)
+        if status == "fixed" and changed_by == "citizen":
+            c.contact_enc = None
+        s.add(StatusChange(complaint_id=c.id, status=status, changed_by=changed_by, note=(note or "")[:500] or None))
+        s.flush()
+        return public_complaint(c, officer=True)
+
+
+def reroute(tracking_number: int, department: str, note: str | None = None) -> dict | None:
+    """An officer sends a complaint to a different office (the AI picked the wrong one)."""
+    with Session(get_engine()) as s, s.begin():
+        c = s.scalar(select(Complaint).where(Complaint.tracking_number == tracking_number).with_for_update())
+        if c is None:
+            return None
+        old, c.department = c.department, department
+        s.add(StatusChange(complaint_id=c.id, status=c.status, changed_by="officer",
+                           note=f"re-routed from {old} to {department}" + (f": {note}" if note else "")))
+        s.flush()
+        return public_complaint(c, officer=True)
+
+
+def add_photo(tracking_number: int, kind: str, mime: str, data: bytes, verdict: dict | None) -> int | None:
+    with Session(get_engine()) as s, s.begin():
+        c = s.scalar(select(Complaint).where(Complaint.tracking_number == tracking_number))
+        if c is None:
+            return None
+        p = Photo(complaint_id=c.id, kind=kind, mime=mime, data=data, gemma_verdict=verdict)
+        s.add(p)
+        s.flush()
+        return p.id
+
+
+def get_photo(tracking_number: int, photo_id: int) -> tuple[str, bytes] | None:
+    with Session(get_engine()) as s:
+        p = s.scalar(select(Photo).join(Complaint, Photo.complaint_id == Complaint.id).where(
+            Complaint.tracking_number == tracking_number, Photo.id == photo_id))
+        return (p.mime, p.data) if p else None
+
+
+def citizen_photo(tracking_number: int) -> tuple[str, bytes] | None:
+    """The citizen's own photo of the problem, if they sent one — compared with the fix photo."""
+    with Session(get_engine()) as s:
+        p = s.scalar(select(Photo).join(Complaint, Photo.complaint_id == Complaint.id).where(
+            Complaint.tracking_number == tracking_number, Photo.kind == "citizen").order_by(Photo.id).limit(1))
+        return (p.mime, p.data) if p else None
+
+
+def contact_for(tracking_number: int) -> tuple[str | None, dict | None]:
+    """The encrypted contact (for the follow-up) and the complaint, for the follow-up call/message."""
+    with Session(get_engine()) as s:
+        c = s.scalar(select(Complaint).where(Complaint.tracking_number == tracking_number))
+        return (c.contact_enc, public_complaint(c, officer=True)) if c else (None, None)
+
+
+def timeline(s: Session, complaint_id: int) -> list[dict]:
+    return [{"status": t.status, "by": t.changed_by, "note": t.note, "at": t.created_at.isoformat()}
+            for t in s.scalars(select(StatusChange).where(StatusChange.complaint_id == complaint_id)
+                               .order_by(StatusChange.id))]
+
+
+def photos_meta(s: Session, complaint_id: int) -> list[dict]:
+    return [{"id": p.id, "kind": p.kind, "verdict": p.gemma_verdict, "at": p.created_at.isoformat()}
+            for p in s.scalars(select(Photo).where(Photo.complaint_id == complaint_id).order_by(Photo.id))]
+
+
+def all_for_scorecard() -> list[dict]:
+    """Every original complaint with its timeline, for the per-office scorecard."""
+    with Session(get_engine()) as s:
+        out = []
+        for c in s.scalars(select(Complaint).where(Complaint.duplicate_of.is_(None))):
+            d = public_complaint(c)
+            fixed_at = s.scalar(select(StatusChange.created_at).where(
+                StatusChange.complaint_id == c.id, StatusChange.status == "fixed").order_by(StatusChange.id).limit(1))
+            d["fixed_at"] = fixed_at.isoformat() if fixed_at else None
+            out.append(d)
         return out

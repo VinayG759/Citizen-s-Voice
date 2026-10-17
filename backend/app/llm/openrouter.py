@@ -1,5 +1,6 @@
 """Gemma 4 through OpenRouter (OpenAI-compatible format). Used only as the fallback."""
 
+import base64
 import json
 import time
 
@@ -13,7 +14,11 @@ URL = "https://openrouter.ai/api/v1/chat/completions"
 def _messages(system: str, messages: list[Msg]) -> list[dict]:
     out: list[dict] = [{"role": "system", "content": system}]
     for m in messages:
-        if m.role == "user":
+        if m.role == "user" and m.images:
+            out.append({"role": "user", "content": [{"type": "text", "text": m.text}] + [
+                {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{base64.b64encode(data).decode()}"}}
+                for mime, data in m.images]})
+        elif m.role == "user":
             out.append({"role": "user", "content": m.text})
         elif m.role == "model":
             msg: dict = {"role": "assistant", "content": m.text or None}

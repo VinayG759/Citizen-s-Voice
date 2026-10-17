@@ -1,5 +1,6 @@
 """Gemma 4 through Google's Gemini API (native format — the only one that can switch thinking off)."""
 
+import base64
 import time
 import uuid
 
@@ -29,7 +30,9 @@ def _contents(messages: list[Msg]) -> list[dict]:
     contents = []
     for m in messages:
         if m.role == "user":
-            contents.append({"role": "user", "parts": [{"text": m.text}]})
+            parts = [{"text": m.text}] + [{"inline_data": {"mime_type": mime, "data": base64.b64encode(data).decode()}}
+                                         for mime, data in m.images]
+            contents.append({"role": "user", "parts": parts})
         elif m.role == "model":
             parts = [{"text": m.text}] if m.text else []
             for c in m.tool_calls:

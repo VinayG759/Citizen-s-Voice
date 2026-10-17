@@ -11,7 +11,7 @@ Rules enforced here, not trusted to the model:
 import re
 from dataclasses import dataclass, field
 
-from app.db.models import CATEGORIES
+from app.db.models import CATEGORIES, DEFAULT_DEPARTMENT, DEPARTMENTS
 from app.llm.types import ToolSpec
 from app.places import gazetteer
 
@@ -60,6 +60,15 @@ SPECS = [
             "caller_confirmed": {"type": "boolean", "description": "true only if the caller said the read-back is right"},
             "same_as": {"type": "string", "description": "tracking ID from find_nearby_complaints if this is the SAME "
                                                          "problem already reported; leave out for a new problem"},
+            "department": {"type": "string", "enum": list(DEPARTMENTS),
+                           "description": "the office responsible: bbmp (city roads, garbage, drains, lights, "
+                                          "trees, stray animals), bescom (power), bwssb (water), bmtc (buses), "
+                                          "traffic_police, police (non-emergency), health, education, "
+                                          "food_civil_supplies (ration shops), revenue (pensions, certificates), "
+                                          "pollution_board, panchayat (villages outside the city), lokayukta "
+                                          "(bribes, corruption), unrouted (no office clearly fits)"},
+            "sensitive": {"type": "boolean", "description": "true for harassment, violence, abuse or corruption: "
+                                                            "the caller's identity is not kept"},
         }, "required": ["category", "summary_en", "place_id", "caller_confirmed"]},
     ),
     ToolSpec(
@@ -146,8 +155,12 @@ def file_complaint(state: ToolState, repo, session_info: dict, **a) -> dict:
     urgency = a.get("urgency") if isinstance(a.get("urgency"), int) else 3
     if state.emergency_reason:
         urgency = 5
+    department = a.get("department") if a.get("department") in DEPARTMENTS else DEFAULT_DEPARTMENT[a["category"]]
+    sensitive = bool(a.get("sensitive")) or a["category"] == "corruption"
     fields = dict(
         category=a["category"],
+        department=department,
+        sensitive=sensitive,
         summary_en=a["summary_en"].strip()[:500],
         summary_local=(a.get("summary_local") or "").strip()[:500] or None,
         language=session_info.get("language"),
@@ -159,8 +172,10 @@ def file_complaint(state: ToolState, repo, session_info: dict, **a) -> dict:
         lon=p.lon,
         place_source="gazetteer",
         since_when=(a.get("since_when") or "").strip()[:100] or None,
-        caller_hash=session_info.get("caller_hash"),
-        caller_last4=session_info.get("caller_last4"),
+        # Sensitive reports keep no trace of who reported them.
+        caller_hash=None if sensitive else session_info.get("caller_hash"),
+        caller_last4=None if sensitive else session_info.get("caller_last4"),
+        contact_enc=None if sensitive else session_info.get("contact_enc"),
         channel=session_info.get("channel", "web"),
     )
     if same_as:
@@ -173,7 +188,7 @@ def file_complaint(state: ToolState, repo, session_info: dict, **a) -> dict:
     filed = repo.file_complaint(**fields)
     state.filed = filed
     return {"ok": True, "tracking_id": filed.tracking_id, "say_tracking_id_as": spoken_id(filed.tracking_number),
-            "place": p.label}
+            "place": p.label, "sent_to": department}
 
 
 def find_nearby_complaints(state: ToolState, repo, place_id: str, category: str) -> dict:
@@ -182,6 +197,8 @@ def find_nearby_complaints(state: ToolState, repo, place_id: str, category: str)
         return {"error": "place_id must come from find_place"}
     if category not in CATEGORIES:
         return {"error": f"category must be one of {list(CATEGORIES)}"}
+    if category in ("safety", "corruption"):  # never merge people's sensitive reports together
+        return {"matches": [], "note": "Sensitive reports are always filed on their own."}
     found = repo.nearby_open(offered.place.lat, offered.place.lon, category)[:3]
     for f in found:
         state.nearby_seen[f["tracking_id"]] = f["tracking_number"]

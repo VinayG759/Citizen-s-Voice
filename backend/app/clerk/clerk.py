@@ -77,6 +77,7 @@ class Conversation:
     channel: str = "web"
     caller_hash: str | None = None
     caller_last4: str | None = None
+    contact_enc: str | None = None  # encrypted phone number / chat id, for the follow-up (app/contact.py)
     language: str = "kn-IN"
     messages: list[Msg] = field(default_factory=list)
     state: tools.ToolState = field(default_factory=tools.ToolState)
@@ -187,7 +188,7 @@ class Conversation:
                 out = tools.find_place(self.state, str(args.get("query", "")), args.get("area"), args.get("road"))
             elif name == "file_complaint":
                 info = {"language": self.language, "caller_hash": self.caller_hash,
-                        "caller_last4": self.caller_last4, "channel": self.channel}
+                        "caller_last4": self.caller_last4, "channel": self.channel, "contact_enc": self.contact_enc}
                 out = tools.file_complaint(self.state, self.repo, info, **args)
             elif name == "get_complaint_status":
                 out = tools.get_complaint_status(self.repo, args.get("tracking_id"), self.caller_hash, self.channel)

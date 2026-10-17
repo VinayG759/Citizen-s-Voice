@@ -29,14 +29,14 @@ def test_public_view_never_contains_the_caller_hash():
 
 
 def test_complaints_list(monkeypatch):
-    monkeypatch.setattr(complaints_api.repo, "list_complaints", lambda limit: [repo.public_complaint(sample())])
+    monkeypatch.setattr(complaints_api.repo, "list_complaints", lambda *a: [repo.public_complaint(sample())])
     r = client.get("/api/complaints")
     assert r.status_code == 200 and r.json()[0]["place_name"] == "St. Mary's School"
 
 
 def test_complaint_detail_accepts_spoken_forms_and_404s(monkeypatch):
     seen = []
-    monkeypatch.setattr(complaints_api.repo, "complaint_detail", lambda n: seen.append(n) or None)
+    monkeypatch.setattr(complaints_api.repo, "complaint_detail", lambda n, *a: seen.append(n) or None)
     assert client.get("/api/complaints/CV-1004").status_code == 404
     assert client.get("/api/complaints/nonsense").status_code == 404
     assert seen == [1004]

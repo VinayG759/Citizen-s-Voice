@@ -20,6 +20,7 @@ from fastapi.responses import Response
 
 from app import events
 from app.clerk.clerk import Conversation
+from app.contact import seal
 from app.db.repo import Repo
 from app.phone import vobiz
 from app.phone.call import PhoneCall
@@ -115,7 +116,7 @@ async def stream(ws: WebSocket, token: str) -> None:
                 repo = Repo()
                 call_id = await asyncio.to_thread(repo.start_call, "phone", caller_hash, call_uuid)
                 conv = Conversation(call_id=call_id, repo=repo, channel="phone",
-                                    caller_hash=caller_hash, caller_last4=last4)
+                                    caller_hash=caller_hash, caller_last4=last4, contact_enc=seal("phone", caller))
                 call = PhoneCall(ws, start.get("streamId", msg.get("streamId", "")), call_uuid, conv)
                 events.publish("call_started", call_id=call_id, channel="phone", caller_last4=last4)
                 fmt = start.get("mediaFormat", {})

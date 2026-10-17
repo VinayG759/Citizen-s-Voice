@@ -46,6 +46,27 @@ class Settings(BaseSettings):
 
     # Keyed hash for caller phone numbers / web sessions. Set a long random value in production.
     caller_hash_key: str = "dev-only-not-secret"
+    # Encrypts how to reach a citizen for the follow-up call/message. Empty: no contact is stored.
+    # python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    contact_encryption_key: str = ""
+
+    # Officers sign in with this passcode to change a complaint's status (single shared passcode:
+    # enough for a pilot; stated in the README). Empty: officer actions are disabled.
+    officer_passcode: str = ""
+
+    # Switches, so a feature that misbehaves on stage can be turned off without a deploy of new code.
+    feature_photo_check: bool = True
+    feature_callback: bool = True
+
+    # Telegram (bot token from @BotFather; a secret we choose for the webhook).
+    telegram_bot_token: str = ""
+    telegram_webhook_secret: str = ""
+
+    # WhatsApp Cloud API (Meta app).
+    whatsapp_access_token: str = ""
+    whatsapp_phone_number_id: str = ""
+    whatsapp_verify_token: str = ""
+    whatsapp_app_secret: str = ""
 
     # Vobiz — the phone line.
     vobiz_auth_id: str = ""

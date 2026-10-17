@@ -19,6 +19,7 @@ class Msg:
     tool_call_id: str = ""  # role == "tool"
     tool_name: str = ""  # role == "tool"
     tool_result: dict | None = None  # role == "tool"
+    images: list[tuple[str, bytes]] = field(default_factory=list)  # role == "user": (mime type, bytes)
 
 
 @dataclass(frozen=True)
