@@ -14,7 +14,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Header, HTT
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
-from app import events, officer, vision
+from app import brief, events, officer, vision
 from app.db import repo
 from app.db.models import DEPARTMENTS
 from app.settings import get_settings
@@ -87,6 +87,12 @@ def scorecard() -> list[dict]:
             "median_days_to_fix": round(statistics.median(days), 1) if days else None,
         })
     return sorted(rows, key=lambda r: (-r["overdue"], -r["open"]))
+
+
+@router.get("/brief", dependencies=[Depends(officer.require_officer)])
+def morning_brief() -> dict:
+    """Today's brief for officers: numbers by code, sentences by Gemma, every number checked (app/brief.py)."""
+    return brief.morning_brief(repo.all_for_scorecard())
 
 
 # ---- officer actions -------------------------------------------------------------------------
