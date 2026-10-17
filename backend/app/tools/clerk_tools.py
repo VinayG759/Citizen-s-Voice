@@ -135,11 +135,13 @@ def find_place(state: ToolState, query: str, area: str | None = None, road: str 
         return {"matches": out,
                 "note": f"None of these is in {area}: the nearest is {round(matches[0].distance_km_from_area)} km "
                         "away. Do not read these back. Ask for a nearby landmark, bus stop or road in "
-                        f"{area}, then search again."}
+                        f"{area}, then search again. If that fails too, file at {area} itself with their "
+                        "landmark in words."}
     return {
         "matches": out,
         "note": "If the first match fits what the caller said, read it back for a yes/no, using its name "
-                "as given here. Ask the caller to choose only if the matches are genuinely different places.",
+                "as given here. Ask the caller to choose only if the matches are genuinely different places. "
+                "If the caller says it is not the place, never offer it again.",
     }
 
 

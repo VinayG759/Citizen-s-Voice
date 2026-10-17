@@ -243,6 +243,16 @@ def test_a_chat_conversation_uses_the_instant_lock():
     assert not Conversation(call_id=1, repo=None).lock.instant  # phone calls keep the two-turn rule
 
 
+def test_a_chat_is_told_to_ask_for_a_location_pin_and_a_call_is_not():
+    # Tester's report, 17 Oct: a school missing from the map; the citizen said "No" and was offered it again.
+    from app.clerk.prompt import system_prompt
+    from app.tools.clerk_tools import ToolState
+    chat, call = system_prompt(ToolState(), "en-IN", chat=True), system_prompt(ToolState(), "en-IN")
+    assert "location pin" in chat and "location pin" not in call
+    for p in (chat, call):  # every channel: never re-offer a rejected place; fall back to the area
+        assert "never offer it again" in p and "file at the" in p
+
+
 def test_a_place_name_inside_kannada_is_not_english():
     from app.clerk.language import LanguageLock
     lock = LanguageLock()

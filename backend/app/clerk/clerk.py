@@ -142,7 +142,7 @@ class Conversation:
             last_round = round_ == MAX_TOOL_ROUNDS
             try:
                 reply = router.generate(
-                    system=system_prompt(self.state, self.language, self.lock.pending),
+                    system=system_prompt(self.state, self.language, self.lock.pending, chat=self.written),
                     messages=self.messages,
                     tools=[] if last_round else tools.SPECS,
                     mode="live",

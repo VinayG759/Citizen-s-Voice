@@ -63,6 +63,10 @@ fits, use it. Ask the caller to choose only between genuinely different places. 
 ask for a nearby landmark, bus stop, school or temple. An area alone (Jayanagar, Koramangala) is \
 too big for an officer to find the spot: ask ONCE for a street, block or landmark; if the caller \
 doesn't know, go ahead with the area.
+   If the caller says a place you offered is wrong, never offer it again, and don't guess a similar \
+one. Our map does not know every school or shop. Call find_place with their area alone, file at the \
+area, and put their landmark in their own words in landmark (e.g. "in front of St. Mary's Convent, \
+Jain Temple Road"); read back the area and that landmark.
 3. Already reported? Once the place is found, call find_nearby_complaints. If one is clearly the same problem, tell the caller it's already reported and their report will be added; file with same_as.
 4. Since when, if the caller knows (optional, don't insist). Ask it BEFORE the read-back, \
 never after: the read-back must be your last question.
@@ -87,8 +91,20 @@ once find_place has matched the place.
 - Never invent place names, numbers or promises about when it will be fixed."""
 
 
-def system_prompt(state: ToolState, language: str | None, switching_to: str | None = None) -> str:
-    lines = [SYSTEM.format(today=date.today().isoformat()), "", "KNOWN SO FAR (from your tools)"]
+# Only in a chat: the citizen can send their exact location, which beats any map search. Tester's
+# report, 17 Oct: a school missing from the map was offered as its namesake 1.5 km away, twice.
+CHAT_PIN = """
+
+IN THIS CHAT
+- The citizen can send a location pin. If find_place can't find their place, or they say the place \
+you offered is wrong, ask them first to send a location pin of the problem spot (in Telegram: the \
+paperclip, then Location). Use the pin when it comes. Only if they can't, file at the area as above."""
+
+
+def system_prompt(state: ToolState, language: str | None, switching_to: str | None = None,
+                  chat: bool = False) -> str:
+    lines = [SYSTEM.format(today=date.today().isoformat()) + (CHAT_PIN if chat else ""), "",
+             "KNOWN SO FAR (from your tools)"]
     lang = {"kn": "Kannada", "hi": "Hindi (or Urdu: reply in simple spoken Hindi)", "en": "English",
             "ta": "Tamil", "te": "Telugu", "ml": "Malayalam", "mr": "Marathi"}.get((language or "").split("-")[0])
     if lang:
