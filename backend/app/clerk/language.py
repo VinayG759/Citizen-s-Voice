@@ -19,6 +19,7 @@ _NAMED = {
     "te-IN": ("telugu", "ತೆಲುಗು", "तेलुगु", "தெலுங்கு", "తెలుగు"),
 }
 SWITCH_AFTER = 2  # turns in a row in another language before the call follows
+_INDIAN_LETTERS = re.compile(r"[ऀ-෿]")  # Devanagari to Sinhala: every Indian script we hear
 
 
 def named_language(text: str) -> str | None:
@@ -55,6 +56,10 @@ class LanguageLock:
             self.language, self.locked, self._other_turns = named, True, 0
             return self.language
         heard = spoken_form(heard)
+        if heard == "en-IN" and _INDIAN_LETTERS.search(text):
+            # "Kadu Malleshwara Temple ಎದುರು": a name said inside Kannada gets labelled English. Someone
+            # really speaking English writes no Indian letters, so this turn says nothing about the language.
+            heard = None
         if not heard:
             return self.language
         if not self.locked:

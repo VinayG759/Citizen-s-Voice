@@ -222,7 +222,7 @@ class ChatClerk:
         events.publish("call_started", call_id=call_id, channel=self.channel, greeting="")
         # The chat id, encrypted, so the "is it really fixed?" follow-up can message them later.
         return Conversation(call_id=call_id, repo=repo, channel=self.channel, caller_hash=caller_hash,
-                            contact_enc=contact.seal(self.channel, chat_id))
+                            contact_enc=contact.seal(self.channel, chat_id), written=True)
 
     def _pin(self, conv: Conversation, lat: float, lon: float) -> str:
         """A location pin becomes a place the clerk may file at, without asking where."""

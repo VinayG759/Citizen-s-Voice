@@ -225,6 +225,17 @@ def test_one_turn_in_another_language_asks_before_switching():
     assert lock.language == "en-IN" and lock.pending is None
 
 
+def test_a_place_name_inside_kannada_is_not_english():
+    from app.clerk.language import LanguageLock
+    lock = LanguageLock()
+    lock.update("kn-IN", "Malleshwaram-ನಲ್ಲಿ ಕಸದ ತೊಟ್ಟಿಯನ್ನು clean ಮಾಡಿಲ್ಲ")
+    # A real Telegram voice note, 17 Oct: Sarvam labelled it English and wrote ಎದುರು in Telugu letters.
+    assert lock.update("en-IN", "Kadu Malleshwara Temple ఎదురు") == "kn-IN"
+    assert lock.pending is None  # not even a question about switching
+    lock.update("en-IN", "Actually it is near the bus stop")  # really English: still noticed
+    assert lock.pending == "en-IN"
+
+
 @pytest.mark.parametrize("text,expected", [
     ("ಸರಿ, gate ಹತ್ತಿರ… ಎಷ್ಟು ದಿನದಿಂದ?", "kn-IN"),
     ("अच्छा, 3-4 दिन… कहाँ पर?", "hi-IN"),

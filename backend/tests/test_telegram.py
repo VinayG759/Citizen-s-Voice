@@ -155,6 +155,15 @@ def test_a_location_pin_is_the_place_and_the_chat_can_be_reached_later(monkeypat
     assert "CV-1042" in texts()[0] and "C V," not in texts()[0]  # written for reading, not for the ear
 
 
+def test_the_filing_message_is_written_for_a_chat_not_read_out_on_a_call(monkeypatch):
+    lat, lon = 13.0957, 77.5790
+    monkeypatch.setattr(clerk_mod.router, "generate", lambda **_: file_at(f"pin:{lat:.5f},{lon:.5f}"))
+    post({"location": {"latitude": lat, "longitude": lon}})
+    done = texts()[0]
+    assert done.count("CV-1042") == 1  # said once: a reader can scroll back
+    assert "Once more" not in done and "calling" not in done and "ಇನ್ನೊಂದ್ಸಲ" not in done
+
+
 def test_a_pin_outside_bengaluru_is_not_a_place(monkeypatch):
     told = []
     monkeypatch.setattr(clerk_mod.router, "generate",

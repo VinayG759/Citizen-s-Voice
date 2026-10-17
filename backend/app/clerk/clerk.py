@@ -48,6 +48,22 @@ ADDED = {
           "மீண்டும்: {sid}. நன்றி.",
     "te": "ఈ problem ఇప్పటికే report అయింది. మీరు {n}వ వ్యక్తి.{raised} Tracking ID {sid}. మళ్ళీ: {sid}. ధన్యవాదాలు.",
 }
+# The same two, for a chat: read, not heard, so the ID is written once ("CV-1042") and nobody "called".
+FILED_WRITTEN = {
+    "kn": "ಸರಿ, ನಿಮ್ಮ complaint register ಆಗಿದೆ. Tracking ID: {sid}. ಧನ್ಯವಾದಗಳು.",
+    "hi": "ठीक है, आपकी complaint register हो गई है। Tracking ID: {sid}. धन्यवाद।",
+    "en": "Okay, your complaint is registered. Tracking ID: {sid}. Thank you.",
+    "ta": "உங்கள் complaint பதிவு செய்யப்பட்டது. Tracking ID: {sid}. நன்றி.",
+    "te": "మీ complaint నమోదు అయింది. Tracking ID: {sid}. ధన్యవాదాలు.",
+}
+ADDED_WRITTEN = {
+    "kn": "ಈ problem ಅನ್ನು ಈಗಾಗಲೇ report ಮಾಡಲಾಗಿದೆ. ನೀವು {n}ನೇ ವ್ಯಕ್ತಿ.{raised} Tracking ID: {sid}. ಧನ್ಯವಾದಗಳು.",
+    "hi": "यह problem पहले से report हो चुकी है। आप {n}वें व्यक्ति हैं।{raised} Tracking ID: {sid}. धन्यवाद।",
+    "en": "This problem was already reported. You are person number {n} to report it.{raised} Tracking ID: {sid}. "
+          "Thank you.",
+    "ta": "இந்த problem ஏற்கனவே report செய்யப்பட்டுள்ளது. நீங்கள் {n}-வது நபர்.{raised} Tracking ID: {sid}. நன்றி.",
+    "te": "ఈ problem ఇప్పటికే report అయింది. మీరు {n}వ వ్యక్తి.{raised} Tracking ID: {sid}. ధన్యవాదాలు.",
+}
 RAISED = {"kn": " ಇದರ priority ಹೆಚ್ಚಿಸಲಾಗಿದೆ.", "hi": " इसकी priority बढ़ा दी गई है।",
           "en": " Its priority has been raised.", "ta": " இதன் priority உயர்த்தப்பட்டது.",
           "te": " దీని priority పెంచబడింది."}
@@ -83,6 +99,7 @@ class Conversation:
     state: tools.ToolState = field(default_factory=tools.ToolState)
     _raised: bool = False
     lock: LanguageLock = field(default_factory=LanguageLock)
+    written: bool = False  # a chat (read on a screen) rather than a call (heard)
     # Called with Gemma's short "let me check…" words when it uses a tool, so the phone can say
     # them at once instead of leaving the caller in silence while the tool runs.
     on_interim: object = None
@@ -167,12 +184,13 @@ class Conversation:
                 self.messages.append(Msg("tool", tool_call_id=call.id, tool_name=call.name, tool_result=result))
 
             if filed_before is None and self.state.filed is not None:
-                sid = tools.spoken_id(self.state.filed.tracking_number)
+                filed_lines, added_lines = (FILED_WRITTEN, ADDED_WRITTEN) if self.written else (FILED, ADDED)
+                sid = self.state.filed.tracking_id if self.written else tools.spoken_id(self.state.filed.tracking_number)
                 if self.state.report_count:
                     raised = RAISED.get(lang, RAISED["en"]) if self._raised else ""
-                    text = ADDED.get(lang, ADDED["en"]).format(sid=sid, n=self.state.report_count, raised=raised)
+                    text = added_lines.get(lang, added_lines["en"]).format(sid=sid, n=self.state.report_count, raised=raised)
                 else:
-                    text = FILED.get(lang, FILED["en"]).format(sid=sid)
+                    text = filed_lines.get(lang, filed_lines["en"]).format(sid=sid)
                 self.messages.append(Msg("model", text))
                 events.append(_event("decision", text="filed; confirmed the tracking ID to the caller"))
                 return TurnResult(text, self.language, events, llm_ms,
