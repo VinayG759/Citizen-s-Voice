@@ -1,0 +1,451 @@
+/* The officer dashboard: a sidebar and one page per job. Tokens only. */
+
+.shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  flex: none;
+  width: 248px;
+  height: 100vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-4);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+}
+
+/* The page area scrolls on its own, so the sidebar and the Live desk always fill the screen. */
+.shell__main {
+  flex: 1;
+  min-width: 0;
+  height: 100vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.brand__name--sm {
+  font-size: var(--text-md);
+  font-weight: var(--weight-strong);
+}
+
+/* Navigation */
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.nav__group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav__heading {
+  margin-bottom: var(--space-1);
+  padding: 0 var(--space-3);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.nav__link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 40px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.nav__link:hover {
+  background: var(--surface-sunken);
+  color: var(--text);
+}
+
+.nav__link[aria-current="page"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: var(--weight-strong);
+}
+
+.nav__footer {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: stretch;
+}
+
+.nav__footer .input--sm {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+
+.nav__footer .status {
+  flex-wrap: wrap;
+}
+
+/* Page header and body */
+.pagehead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5) 0;
+}
+
+.pagehead__title {
+  font-size: var(--text-lg);
+}
+
+.pagehead__sub {
+  margin-top: var(--space-1);
+  max-width: 70ch;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.pagehead__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.page-body {
+  width: 100%;
+  max-width: 1100px;
+  padding: var(--space-4) var(--space-5) var(--space-5);
+}
+
+.page-body a {
+  color: var(--accent);
+  font-weight: var(--weight-strong);
+}
+
+/* Live desk: the map, and beside it the live call and the newest complaints */
+.desk {
+  flex: 1;
+  min-height: 480px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 400px);
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+}
+
+.desk__map {
+  min-height: 360px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.desk__side {
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.desk__more {
+  margin-top: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.desk__more a {
+  color: var(--accent);
+  font-weight: var(--weight-strong);
+}
+
+/* Map page */
+.mapview {
+  flex: 1;
+  min-height: 420px;
+  display: flex;
+  padding: var(--space-4) var(--space-5) var(--space-5);
+}
+
+.mapview__map {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+/* Complaints filters */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.filters__select {
+  flex: 0 1 190px;
+  min-width: 140px;
+}
+
+/* Offices */
+.score-wrap {
+  overflow-x: auto;
+}
+
+/* Emerging issues */
+.emerging {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.emerging__top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.emerging__what {
+  font-weight: var(--weight-strong);
+}
+
+.emerging__source {
+  margin-left: auto;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.emerging__headline {
+  font-weight: var(--weight-strong);
+}
+
+.emerging__facts,
+.emerging__evidence {
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.emerging__evidence a {
+  color: var(--accent);
+}
+
+/* Morning brief */
+.brief {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.brief__summary {
+  line-height: 1.6;
+}
+
+.brief__local {
+  margin-top: var(--space-3);
+  color: var(--text-muted);
+  line-height: 1.8;
+}
+
+.brief__source {
+  margin-top: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.brief__clusters {
+  margin: 0;
+  padding-left: var(--space-5);
+}
+
+.brief__signin {
+  margin-top: var(--space-3);
+}
+
+.tiles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: var(--space-3);
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.tile__value {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-strong);
+}
+
+.tile__label {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* Phones and small tablets: a slim top bar and a menu that slides in over the page */
+.topbar,
+.drawer {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .shell {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    display: none;
+  }
+
+  .shell__main {
+    height: auto;
+    overflow: visible;
+  }
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 1050;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .topbar__right {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+
+  .topbar__page {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .topbar__menu {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  .topbar__menu:hover {
+    background: var(--surface-sunken);
+  }
+
+  .drawer {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    display: block;
+  }
+
+  .drawer__scrim {
+    position: absolute;
+    inset: 0;
+    background: var(--scrim);
+  }
+
+  .drawer__panel {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 288px;
+    max-width: 85vw;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+    padding: var(--space-4);
+    overflow-y: auto;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    animation: drawer-in 0.2s ease-out;
+  }
+
+  .drawer__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .pagehead,
+  .page-body,
+  .desk,
+  .mapview {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
+
+  .desk {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .desk__map {
+    order: -1; /* on a phone the map comes first */
+    height: 360px;
+  }
+
+  .desk__side {
+    overflow: visible;
+  }
+
+  .mapview {
+    min-height: 0;
+  }
+
+  .mapview__map {
+    height: 70vh;
+    min-height: 360px;
+  }
+}
+
+@keyframes drawer-in {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
