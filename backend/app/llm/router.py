@@ -50,6 +50,7 @@ def generate(
     mode: Literal["live", "background"] = "live",
     caller_language: str | None = None,
     max_tokens: int = 400,
+    primary_timeout_s: float | None = None,  # how long to wait for Google before OpenRouter; None: the mode's default
 ) -> LLMReply:
     s = get_settings()
     live = mode == "live"
@@ -69,7 +70,7 @@ def generate(
         sys_prompt, use_model = system, model
         for _ in range(2):
             try:
-                reply = _call(provider, use_model, sys_prompt, messages, tools, live, max_tokens)
+                reply = _call(provider, use_model, sys_prompt, messages, tools, live, max_tokens, primary_timeout_s)
             except LLMError as e:
                 errors.append(str(e))
                 log.warning("LLM %s/%s failed: %s", provider, use_model, e)
@@ -86,13 +87,13 @@ def generate(
 
 
 def _call(provider: str, model: str, system: str, messages: list[Msg], tools: list[ToolSpec],
-          live: bool, max_tokens: int) -> LLMReply:
+          live: bool, max_tokens: int, primary_timeout_s: float | None = None) -> LLMReply:
     s = get_settings()
     if provider == "gemini":
         return gemini.generate(
             api_key=s.gemini_api_key, model=model, system=system, messages=messages, tools=tools,
             thinking="minimal" if live else "high", max_tokens=max_tokens if live else max_tokens * 4,
-            timeout_s=s.llm_primary_timeout_s if live else 60,
+            timeout_s=primary_timeout_s or (s.llm_primary_timeout_s if live else 60),
         )
     return openrouter.generate(
         api_key=s.openrouter_api_key, model=model, system=system, messages=messages, tools=tools,

@@ -12,6 +12,7 @@ import logging
 
 from app.llm import router
 from app.llm.types import LLMError, Msg
+from app.settings import get_settings
 
 log = logging.getLogger(__name__)
 
@@ -92,7 +93,8 @@ def check_fix(photo: tuple[str, bytes], complaint: dict, before: tuple[str, byte
     try:
         reply = router.generate(system="You judge photos carefully and honestly. Never guess beyond what is visible.",
                                 messages=[Msg("user", prompt, images=images)], tools=[], mode="background",
-                                caller_language="en-IN", max_tokens=300)
+                                caller_language="en-IN", max_tokens=300,
+                                primary_timeout_s=get_settings().photo_check_google_timeout_s)
     except LLMError as e:
         log.warning("photo check failed: %s", e)
         return _unclear("Gemma could not check the photo right now.", error=True)

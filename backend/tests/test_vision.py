@@ -108,3 +108,20 @@ def test_problem_photo_answer_is_cleaned(monkeypatch):
     fake_gemma(monkeypatch, error=LLMError("down"))
     assert vision.look_at_problem(("image/jpeg", JPEG), cats)["error"] is True
     assert vision.look_at_problem(("image/jpeg", b"GIF89a"), cats)["error"] is True
+
+
+def test_the_photo_check_waits_less_for_google_than_other_background_jobs(monkeypatch):
+    # An officer is waiting after "mark fixed": Google gets a short leash, then OpenRouter (17 Oct: 60 s felt broken).
+    calls = fake_gemma(monkeypatch, '{"looks_fixed": "yes", "reason": "Patched."}')
+    vision.check_fix(("image/jpeg", JPEG), COMPLAINT)
+    assert calls[0]["primary_timeout_s"] == vision.get_settings().photo_check_google_timeout_s < 60
+
+
+def test_the_router_gives_google_the_timeout_it_is_told(monkeypatch):
+    from app.llm import router
+    seen = []
+    monkeypatch.setattr(router.get_settings(), "gemini_api_key", "test")  # never depend on the real .env
+    monkeypatch.setattr(router.gemini, "generate", lambda **kw: seen.append(kw["timeout_s"]) or LLMReply("ok", [], "gemini", "m", 5))
+    router.generate(system="s", messages=[], tools=[], mode="background", caller_language="en-IN", primary_timeout_s=20)
+    router.generate(system="s", messages=[], tools=[], mode="background", caller_language="en-IN")
+    assert seen == [20, 60]  # told: that; not told: the background default

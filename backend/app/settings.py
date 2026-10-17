@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     # Google's normal live reply takes ~2 s; slower than this is handed to OpenRouter (real call, 16 Oct:
     # waiting 4 s for a timeout cost the caller 4 s of silence).
     llm_primary_timeout_s: float = 2.5
+    # The fix-photo check: an officer waits after "mark fixed", so Google gets this long, not the background 60 s.
+    photo_check_google_timeout_s: float = 25
 
     # Sarvam — speech to text and text to speech.
     sarvam_api_key: str = ""
