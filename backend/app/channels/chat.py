@@ -1,4 +1,4 @@
-"""One chat with the clerk, for messaging apps: Telegram now, WhatsApp later.
+"""One chat with the clerk, for messaging apps: Telegram and WhatsApp.
 
 A messaging app hands over what the citizen sent (words, a voice note, a photo, a location pin)
 as an `Incoming`, plus a `Messenger` that knows how to send things back on that app. Everything
@@ -17,7 +17,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Protocol
 
-from app import contact, events, vision
+from app import contact, events, followup, vision
 from app.clerk.clerk import Conversation
 from app.clerk.language import guess_language
 from app.db import repo as db
@@ -37,6 +37,7 @@ RATE_LIMIT_WINDOW_S = 10 * 60  # … per 10 minutes
 MAX_PHOTOS = 3  # per complaint
 PHOTO_AFTER_FILING_S = 10 * 60  # a photo this soon after filing belongs to that complaint
 PIN_MAX_KM = 15  # a pin farther than this from every known place is outside Bengaluru
+AWAIT_ANSWER_S = 3 * 24 * 3600  # an unanswered "is it really fixed?" is forgotten after 3 days
 
 # Fixed messages, in the three languages the greeting offers.
 WELCOME = ("ನಮಸ್ಕಾರ, Citizen's Voice ಗೆ ಸ್ವಾಗತ. ನಿಮ್ಮ ಏರಿಯಾದ problem ಬಗ್ಗೆ type ಮಾಡಿ ಅಥವಾ voice message ಕಳಿಸಿ.\n"
@@ -52,6 +53,18 @@ PHOTO_ADDED = ("ನಿಮ್ಮ photo {tid} complaint ಗೆ ಸೇರಿಸಲ�
 TOO_LONG = ("ದಯವಿಟ್ಟು 30 seconds ಒಳಗಿನ voice message ಕಳಿಸಿ. / "
             "Please keep voice notes under 30 seconds.")
 COULD_NOT_FETCH = "ಕ್ಷಮಿಸಿ, ಅದನ್ನು ತೆರೆಯಲು ಆಗಲಿಲ್ಲ. / Sorry, I couldn't open that. Could you send it again?"
+# After an officer marks a complaint fixed: the citizen's own answer decides (app/followup.py).
+FIXED_QUESTION = {
+    "kn": "ನಿಮ್ಮ complaint {tid} ({summary}) fix ಆಗಿದೆ ಅಂತ officer ಹೇಳಿದ್ದಾರೆ. ನಿಜವಾಗ್ಲೂ fix ಆಗಿದ್ಯಾ? "
+          "ಹೌದು ಅಥವಾ ಇಲ್ಲ ಅಂತ reply ಮಾಡಿ.",
+    "hi": "आपकी complaint {tid} ({summary}) को officer ने fixed बताया है। क्या सच में ठीक हो गया? "
+          "हाँ या नहीं में जवाब दीजिए।",
+    "en": "The officer says your complaint {tid} ({summary}) is fixed. Is it really fixed? Please reply yes or no.",
+}
+THANKS = {
+    "yes": "ಧನ್ಯವಾದಗಳು! {tid} fix ಆಗಿದೆ ಅಂತ ದಾಖಲಿಸಿದ್ದೀವಿ. / Thank you! {tid} is recorded as fixed.",
+    "no": "ಕ್ಷಮಿಸಿ. {tid} ಮತ್ತೆ open ಮಾಡಿದ್ದೀವಿ, priority ಹೆಚ್ಚಿಸಿದ್ದೀವಿ. / Sorry. {tid} is reopened with a higher priority.",
+}
 
 
 @dataclass
@@ -89,9 +102,13 @@ class ChatClerk:
         self._chats: dict[str, Chat] = {}
         self._times: dict[str, list[float]] = {}
         self._lock = threading.Lock()
+        self._seen_at: dict[str, float] = {}  # when each chat last wrote to us (WhatsApp's 24-hour rule)
+        self._awaiting: dict[str, tuple[int, str, float]] = {}  # chat → (tracking number, language, asked at)
 
     def handle(self, chat_id: str, msg: Incoming, out: Messenger) -> None:
         """One message from a citizen. Runs in the background: slow work is fine here."""
+        with self._lock:
+            self._seen_at[chat_id] = time.time()
         if self._rate_limited(chat_id):
             out.send_text(chat_id, BUSY)
             return
@@ -118,6 +135,8 @@ class ChatClerk:
         elif words:
             language = guess_language(words)
 
+        if words and self._answered_fixed_question(chat_id, words, language, out):
+            return
         if not (words or msg.photo or msg.location):  # a sticker, a file, a contact card…
             out.send_text(chat_id, HOW_TO)
             return
@@ -155,6 +174,45 @@ class ChatClerk:
         if result.complaint or result.ended:
             chat.conv = None  # one complaint per conversation: the next message starts a new one
             chat.photos.clear()
+
+    def ask_fixed(self, chat_id: str, tracking_number: int, complaint: dict, out: Messenger,
+                  window_s: float | None = None) -> bool:
+        """Send "is it really fixed?" (followup.register_chat). False if it could not be sent.
+        window_s: only if the citizen wrote to us that recently (WhatsApp allows 24 h); otherwise noted."""
+        tid = f"CV-{tracking_number}"
+        if window_s is not None:
+            with self._lock:
+                seen = self._seen_at.get(chat_id)
+            if seen is None or time.time() - seen > window_s:
+                db.add_note(tracking_number, f"call-back: not sent on {self.channel} — it allows messages only within "
+                                             f"{window_s / 3600:.0f} h of the citizen's last message; they can confirm "
+                                             "by calling the helpline")
+                return False
+        lang = (complaint.get("language") or "kn-IN").split("-")[0]
+        summary = (complaint.get("summary_local") if lang != "en" else None) or complaint.get("summary_en") or ""
+        out.send_text(chat_id, FIXED_QUESTION.get(lang, FIXED_QUESTION["en"]).format(tid=tid, summary=summary[:120]))
+        with self._lock:
+            now = time.time()
+            for cid, (_, _, at) in list(self._awaiting.items()):
+                if now - at > AWAIT_ANSWER_S:
+                    self._awaiting.pop(cid, None)
+            self._awaiting[chat_id] = (tracking_number, complaint.get("language") or "kn-IN", now)
+        return True
+
+    def _answered_fixed_question(self, chat_id: str, words: str, language: str | None, out: Messenger) -> bool:
+        """The citizen's reply to "is it really fixed?". True if it was a clear yes or no (handled here);
+        anything else is recorded as unclear and the message goes on to the clerk as usual."""
+        with self._lock:
+            waiting = self._awaiting.pop(chat_id, None)
+        if waiting is None:
+            return False
+        number, asked_in, _ = waiting
+        answer = followup.classify(words, language or asked_in)
+        followup.record_answer(number, answer, words, channel=self.channel)
+        if answer in THANKS:
+            out.send_text(chat_id, THANKS[answer].format(tid=f"CV-{number}"))
+            return True
+        return False
 
     def _new_conversation(self, chat_id: str) -> Conversation:
         repo = Repo()
@@ -245,6 +303,8 @@ class ChatClerk:
         with self._lock:
             self._chats.clear()
             self._times.clear()
+            self._seen_at.clear()
+            self._awaiting.clear()
 
 
 def _written(reply: str, conv: Conversation) -> str:

@@ -24,6 +24,7 @@ import httpx
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi.responses import PlainTextResponse
 
+from app import followup
 from app.channels.chat import COULD_NOT_FETCH, TOO_LONG, ChatClerk, Incoming
 from app.settings import get_settings
 
@@ -35,6 +36,7 @@ MAX_FILE_BYTES = 5_000_000
 # WhatsApp sends no duration with a voice note. Its voice notes are Opus at about 3 KB a second,
 # so this is roughly the 30 s Sarvam can hear in one request.
 MAX_VOICE_BYTES = 120_000
+FREE_REPLY_WINDOW_S = 24 * 3600  # Meta's 24-hour rule (see above)
 
 clerk = ChatClerk("whatsapp")
 _seen: deque[str] = deque(maxlen=2000)  # recent message ids, to ignore Meta's resends
@@ -100,6 +102,23 @@ class WhatsAppApi:
                               data={"messaging_product": "whatsapp", "type": mime},
                               files={"file": ("reply.mp3", audio, mime)}).json()
         self._send(chat_id, {"type": "audio", "audio": {"id": media["id"]}})
+
+
+def ask_fixed(wa_id: str, tracking_number: int, complaint: dict) -> bool:
+    """The call-back after a fix, as a WhatsApp message (app/followup.py) — only inside Meta's 24-hour
+    window; outside it the timeline says why (a template message would be needed, not built)."""
+    s = get_settings()
+    if not s.whatsapp_access_token:
+        return False
+    try:
+        return clerk.ask_fixed(wa_id, tracking_number, complaint, WhatsAppApi(s.whatsapp_access_token,
+                               s.whatsapp_phone_number_id), window_s=FREE_REPLY_WINDOW_S)
+    except WhatsAppError as e:
+        log.warning("whatsapp call-back message failed: %s", e)
+        return False
+
+
+followup.register_chat("whatsapp", ask_fixed)
 
 
 def _first_time(message_id: str) -> bool:

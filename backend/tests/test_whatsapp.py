@@ -202,3 +202,36 @@ def test_delivery_receipts_are_ignored():
     sig = "sha256=" + hmac.new(APP_SECRET.encode(), body, hashlib.sha256).hexdigest()
     assert client.post("/webhooks/whatsapp", content=body, headers={"X-Hub-Signature-256": sig}).status_code == 200
     assert FakeGraph.sent == [] and FakeRepo.calls == []
+
+
+# ---- call-back after a fix: only inside Meta's 24-hour window ------------------------------------
+
+COMPLAINT = {"tracking_id": "CV-1042", "language": "en-IN", "summary_en": "Streetlight broken", "status": "fixed"}
+
+
+def test_the_fixed_question_is_sent_only_if_the_citizen_wrote_within_24_hours(monkeypatch):
+    from app import followup
+
+    notes = []
+    monkeypatch.setattr(chat.db, "add_note", lambda n, note: notes.append((n, note)))
+    assert followup._chat_senders["whatsapp"] is whatsapp.ask_fixed
+
+    assert whatsapp.ask_fixed(WA_ID, 1042, COMPLAINT) is False  # never wrote to us (or before a restart)
+    assert FakeGraph.sent == [] and notes and "24 h" in notes[0][1]
+
+    post({"type": "text", "text": {"body": "hello"}})
+    assert whatsapp.ask_fixed(WA_ID, 1042, COMPLAINT) is True
+    assert "Is it really fixed?" in texts()[-1]
+
+    whatsapp.clerk._seen_at[WA_ID] -= 25 * 3600  # the window has closed
+    assert whatsapp.ask_fixed(WA_ID, 1042, COMPLAINT) is False and len(notes) == 2
+
+
+def test_a_whatsapp_answer_reaches_the_timeline(monkeypatch):
+    got = []
+    monkeypatch.setattr(chat.followup, "classify", lambda text, lang: "no")
+    monkeypatch.setattr(chat.followup, "record_answer", lambda n, a, heard="", attempt=1, channel="": got.append((n, a, channel)))
+    post({"type": "text", "text": {"body": "hi"}})
+    whatsapp.ask_fixed(WA_ID, 1042, COMPLAINT)
+    post({"type": "text", "text": {"body": "still dark"}})
+    assert got == [(1042, "no", "whatsapp")] and "reopened" in texts()[-1]

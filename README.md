@@ -20,7 +20,7 @@ G2, voice-first AI). All code written from 14 October 2026.
 | 4 | Live dashboard: complaint list, OpenStreetMap pins by urgency, live call panel with Gemma's steps, complaint page with full conversation | ✅ built 16 Oct |
 | 5 | Smarter clerk: "already reported nearby" → one tracking ID per problem, priority raised every 3rd report; "what happened to my complaint?" without the number (phone) | ✅ built 16 Oct; golden conversations pass |
 | After filing | Offices and deadlines, overdue, "most urgent first" with its working (open emergencies always first), office scorecard, officer sign-in: start work, send to another office, reopen, mark fixed only with a photo | ✅ built 17 Oct; tested with fakes |
-| 6 | Gemma 4 31B checks the officer's fix photo (advice only); call-back after a fix: we ring the citizen and Gemma reads yes / no / unclear — a "no" reopens | ✅ built 17 Oct; tested with fakes |
+| 6 | Gemma 4 31B checks the officer's fix photo (advice only); call-back after a fix: we ring the citizen (or message them on Telegram / WhatsApp — WhatsApp only within 24 h of their last message) and Gemma reads yes / no / unclear — a "no" reopens | ✅ built 17 Oct; tested with fakes |
 | — | Telegram and WhatsApp: citizens message the clerk by text, voice note, photo or location pin | ✅ built 17 Oct; tested with fakes |
 | — | Emerging issues (spikes and nearby clusters, with evidence) and Morning Brief | ✅ built 17 Oct; tested with fakes |
 | 8 | Demo hardening: `scripts/reset_demo.py` (dry run unless confirmed), `scripts/smoke_test.py`, [demo script](docs/demo-script.md), [judge Q&A](docs/judge-questions.md) | ✅ built 17 Oct |

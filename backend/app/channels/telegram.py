@@ -18,6 +18,7 @@ from collections import deque
 import httpx
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 
+from app import followup
 from app.channels.chat import COULD_NOT_FETCH, TOO_LONG, WELCOME, ChatClerk, Incoming
 from app.settings import get_settings
 
@@ -87,6 +88,22 @@ class TelegramApi:
             self._call("sendChatAction", json={"chat_id": chat_id, "action": "typing"})
         except TelegramError:
             pass
+
+
+def ask_fixed(chat_id: str, tracking_number: int, complaint: dict) -> bool:
+    """The call-back after a fix, as a Telegram message (app/followup.py). The reply comes back as a
+    normal message and chat.py hands it to followup.record_answer."""
+    token = get_settings().telegram_bot_token
+    if not token:
+        return False
+    try:
+        return clerk.ask_fixed(chat_id, tracking_number, complaint, TelegramApi(token))
+    except TelegramError as e:
+        log.warning("telegram call-back message failed: %s", e)
+        return False
+
+
+followup.register_chat("telegram", ask_fixed)
 
 
 def _first_time(update_id: int) -> bool:

@@ -212,3 +212,48 @@ def test_one_chat_cannot_flood_gemma():
     for _ in range(chat.RATE_LIMIT_MESSAGES + 1):
         post({"text": "hello there"})
     assert texts()[-1] == chat.BUSY and texts().count(chat.BUSY) == 1
+
+
+# ---- call-back after a fix: "is it really fixed?" ------------------------------------------------
+
+COMPLAINT = {"tracking_id": "CV-1042", "language": "kn-IN", "summary_en": "Streetlight broken",
+             "summary_local": "street light ಕೆಲಸ ಮಾಡ್ತಿಲ್ಲ", "status": "fixed"}
+
+
+@pytest.fixture
+def answers(monkeypatch):
+    """Fake Gemma reading the answer, and a record of what reaches the timeline."""
+    got = []
+    monkeypatch.setattr(chat.followup, "classify", lambda text, lang: {"ಹೌದು": "yes", "ಇಲ್ಲ": "no"}.get(text, "unclear"))
+    monkeypatch.setattr(chat.followup, "record_answer", lambda n, answer, heard="", attempt=1, channel="": got.append(
+        (n, answer, heard, channel)))
+    return got
+
+
+def test_the_fixed_question_goes_out_through_the_registered_telegram_sender(answers):
+    from app import followup
+
+    assert followup._chat_senders["telegram"] is telegram.ask_fixed
+    assert telegram.ask_fixed(str(CHAT), 1042, COMPLAINT) is True
+    assert "CV-1042" in texts()[-1] and "ಹೌದು" in texts()[-1]  # in the complaint's language
+
+
+def test_a_clear_answer_is_recorded_and_thanked_not_sent_to_the_clerk(answers):
+    telegram.ask_fixed(str(CHAT), 1042, COMPLAINT)
+    post({"text": "ಹೌದು"})
+    assert answers == [(1042, "yes", "ಹೌದು", "telegram")]
+    assert "CV-1042" in texts()[-1] and FakeRepo.calls == []  # no clerk conversation was started
+    post({"text": "ಇಲ್ಲ"})  # asked once, answered once: a later message is just a message
+    assert len(answers) == 1 and texts()[-1] == "ಯಾವ area?"
+
+
+def test_an_unclear_answer_is_recorded_and_the_message_still_reaches_the_clerk(answers):
+    telegram.ask_fixed(str(CHAT), 1042, COMPLAINT)
+    post({"text": "there is garbage near the school"})
+    assert answers == [(1042, "unclear", "there is garbage near the school", "telegram")]
+    assert texts()[-1] == "ಯಾವ area?"
+
+
+def test_no_question_without_a_bot_token(monkeypatch, answers):
+    monkeypatch.setattr(get_settings(), "telegram_bot_token", "")
+    assert telegram.ask_fixed(str(CHAT), 1042, COMPLAINT) is False and FakeApi.sent == []
