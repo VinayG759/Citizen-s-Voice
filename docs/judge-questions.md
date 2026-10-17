@@ -115,15 +115,14 @@ complaint?" without a tracking number, but the code can't be turned back into th
 **15. How will you call people back if you only keep a hash?**
 The number is stored separately, **encrypted** (Fernet, which is AES encryption with tamper
 detection), only if an encryption key is configured, and it's never shown anywhere. The code deletes
-it when the citizen confirms the fix. But that confirmation step is **not built yet** (see 20), so
-today the encrypted number stays.
+it when the citizen confirms the fix (see 20). Until they confirm, it stays.
 
 **16. What about sensitive reports, like harassment or a bribe?**
 Gemma marks them sensitive (anything filed as "corruption" always is). The complaint keeps **no caller
 hash, no last 4 digits and no contact**. The public dashboard shows "a sensitive report" instead of the
 details, and the conversation is visible to officers only. Sensitive reports are never merged with
-other people's. **Gap:** the call log row still keeps the keyed hash of the number. Clearing it on a
-sensitive filing is a small fix we haven't made yet.
+other people's. The call record's keyed hash is cleared too when a sensitive report is filed.
+(Fixed 17 Oct; covered by a test.) A sensitive complaint is never called or messaged back.
 
 **17. Who can see the conversations?**
 For ordinary (non-sensitive) complaints, **anyone** with the complaint page link can read the
@@ -146,19 +145,27 @@ whatever the office). Past it, a complaint is marked **overdue**, gains priority
 "shown to the senior officer". "Most urgent first" ranks complaints by a plain points rule, with the
 working shown ("urgency 4 · 4 reports · overdue by 3 days"). The AI doesn't decide the order. The
 office scorecard shows filed / open / fixed / overdue / median days to fix.
-**Honest limits:** "escalated" is a label on the dashboard. Nobody is notified yet. And the points
-rule can rank an old, much-reported pothole above a 2-hour-old emergency. We'd change the rule so
-emergencies always come first.
+An **open emergency always ranks first**, however old or often-reported the other complaints are
+(fixed 17 Oct after we found an old pothole outranking a live wire; covered by a test).
+**Honest limit:** "escalated" is a label on the dashboard. Nobody is notified yet.
 
 **20. How do you know it's really fixed?**
 "Fixed" requires a photo, and Gemma checks it. If it isn't fixed, an officer can reopen it, which
-raises its urgency. **Not built yet:** the call-back or message asking the citizen to confirm, and the
-citizen confirming the fix themselves. Today the server only records "follow-up requested". Calling
-back needs the outbound-call step on the phone line.
+raises its urgency. **After "fixed", the citizen is asked.** We ring them (phone complaints), or message
+them on Telegram or WhatsApp. Gemma reads their answer as yes, no or unclear. A clear **yes** records
+that the citizen confirmed it and deletes their stored contact. A clear **no** reopens the complaint
+with higher urgency. Anything else is noted on the timeline, with one retry later. Calls happen only
+between 9 AM and 8 PM, never for sensitive reports, and can be switched off (`FEATURE_CALLBACK`).
+WhatsApp only allows free messages within 24 hours of the citizen's last message; outside that
+window we don't send, and the timeline says so.
+**Honest limit:** all of this is tested with fakes. We have **not** yet had a real call-back ring a
+real phone, or a real Telegram/WhatsApp answer come back.
 
 **21. Can citizens send photos?**
-**Not built yet** on any channel. Gemma's photo-reading code for citizens' photos exists, but nothing
-calls it yet. It needs a photo channel, WhatsApp or a web upload.
+On **Telegram and WhatsApp**, yes: a citizen can send a photo (also a voice note or a location pin).
+Gemma 4 looks at it, tells the clerk what it shows so it doesn't ask again, and the photo is kept with
+the complaint, up to 3 per complaint. **Not on the phone line**, which is voice only, and there is no
+upload on the browser page. Tested with fakes; not yet tried by a real citizen.
 
 **22. What happens in an emergency?**
 Gemma tells the caller to **call 112** at once (181 for harassment of a woman, 1098 for a child in
@@ -209,10 +216,11 @@ We have not compared our accuracy or speed with theirs.
 **29. What's really built versus planned?**
 Built and tested: the phone line (a few real calls), the browser page, the Gemma clerk with its five
 tools, the live dashboard and map, duplicate merging, offices, deadlines, overdue status, the
-scorecard, officer actions, the fix-photo check by Gemma, and sensitive reports.
-**Not built yet:** the citizen call-back and confirmation, citizen photos, WhatsApp/Telegram, sending
-complaints into government systems, per-officer accounts, notifications for overdue complaints, cost
-logging, and load testing. The sample complaints on the dashboard are demo data. The complaint filed
+scorecard, officer actions, the fix-photo check by Gemma, sensitive reports, and (tested with fakes
+only) Telegram and WhatsApp chats with photos, voice notes and location pins, and the call-back after
+a fix.
+**Not built yet:** sending complaints into government systems, per-officer accounts, notifications
+for overdue complaints, cost logging, load testing, and WhatsApp messages outside its 24-hour window. The sample complaints on the dashboard are demo data. The complaint filed
 on stage is real.
 
 ---
