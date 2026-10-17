@@ -186,6 +186,7 @@ def test_a_wrong_script_reply_is_retried_with_the_bigger_model_and_a_reminder(mo
         return LLMReply(text, [], "openrouter", kw["model"], 5)
 
     monkeypatch.setattr(router.get_settings(), "gemini_api_key", "")
+    monkeypatch.setattr(router.get_settings(), "openrouter_api_key", "test")  # never depend on the real .env
     monkeypatch.setattr(router.openrouter, "generate", fake_openrouter)
     reply = router.generate(system="clerk", messages=[], tools=[], caller_language="kn-IN")
     assert reply.text == "ಯಾವ area ಅಲ್ಲಿ ಇದೆ?"
