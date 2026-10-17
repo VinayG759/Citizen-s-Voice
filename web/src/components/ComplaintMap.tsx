@@ -3,7 +3,8 @@ import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from "react-leaf
 import "leaflet/dist/leaflet.css";
 import { CATEGORY, type Complaint } from "../lib/complaints";
 
-const BENGALURU_NORTH: [number, number] = [13.1, 77.58];
+// The middle of Bengaluru: places and complaints now cover the whole city, not only the north.
+const BENGALURU: [number, number] = [12.98, 77.59];
 
 /** Leaflet draws on a canvas and needs real colour values, so read them from the design tokens. */
 function urgencyColour(c: Complaint): string {
@@ -27,10 +28,10 @@ type Props = {
   zoom?: number;
 };
 
-export function ComplaintMap({ complaints, selected, onSelect, height = "100%", zoom = 12 }: Props) {
+export function ComplaintMap({ complaints, selected, onSelect, height = "100%", zoom = 11 }: Props) {
   const placed = complaints.filter((c) => c.lat != null && c.lon != null);
   const target = placed.find((c) => c.tracking_id === selected);
-  const centre: [number, number] = placed.length === 1 ? [placed[0].lat!, placed[0].lon!] : BENGALURU_NORTH;
+  const centre: [number, number] = placed.length === 1 ? [placed[0].lat!, placed[0].lon!] : BENGALURU;
 
   return (
     <div className="map" style={{ height }} role="region" aria-label="Map of complaints">
