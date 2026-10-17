@@ -1,0 +1,46 @@
+/* Map pins (lib/pin.ts). Leaflet's divIcon adds a white box by default: remove it. */
+.leaflet-div-icon.pin-icon {
+  background: none;
+  border: 0;
+}
+
+.pin {
+  position: relative;
+  display: block;
+  filter: drop-shadow(0 2px 2px rgb(0 0 0 / 0.35));
+  transition: transform 0.15s ease;
+  transform-origin: bottom center;
+}
+
+.pin svg {
+  display: block;
+}
+
+.leaflet-marker-icon:hover .pin,
+.leaflet-marker-icon:focus-visible .pin {
+  transform: scale(1.1);
+}
+
+/* How many people reported it: the number the old circle's size used to carry. */
+.pin__count {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: 9px;
+  background: #fff;
+  color: #1f2937;
+  border: 1px solid rgb(0 0 0 / 0.25);
+  font: 700 11px/16px system-ui, sans-serif;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pin {
+    transition: none;
+  }
+}

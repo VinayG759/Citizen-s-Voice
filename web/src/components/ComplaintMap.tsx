@@ -1,15 +1,29 @@
 import { useEffect } from "react";
-import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from "react-leaflet";
+import L from "leaflet";
+import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import "./pin.css";
 import { CATEGORY, type Complaint } from "../lib/complaints";
+import { pinHtml, pinSize } from "../lib/pin";
 
 // The middle of Bengaluru: places and complaints now cover the whole city, not only the north.
 const BENGALURU: [number, number] = [12.98, 77.59];
 
-/** Leaflet draws on a canvas and needs real colour values, so read them from the design tokens. */
+/** The pin's SVG needs a real colour value, so read it from the design tokens. */
 function urgencyColour(c: Complaint): string {
   const level = c.is_emergency ? 5 : Math.min(5, Math.max(1, c.urgency));
   return getComputedStyle(document.documentElement).getPropertyValue(`--urgency-${level}`).trim() || "#b45309";
+}
+
+function pinIcon(c: Complaint, selected: boolean): L.DivIcon {
+  const [w, h] = pinSize(selected);
+  return L.divIcon({
+    className: "pin-icon",
+    html: pinHtml(urgencyColour(c), c.report_count, selected),
+    iconSize: [w, h],
+    iconAnchor: [w / 2, h], // the point of the teardrop sits on the spot
+    popupAnchor: [0, -h + 4],
+  });
 }
 
 function FlyTo({ target }: { target: Complaint | undefined }) {
@@ -42,13 +56,14 @@ export function ComplaintMap({ complaints, selected, onSelect, height = "100%", 
         />
         {placed.map((c) => {
           const isSelected = c.tracking_id === selected;
-          const colour = urgencyColour(c);
           return (
-            <CircleMarker
+            <Marker
               key={c.tracking_id}
-              center={[c.lat!, c.lon!]}
-              radius={(isSelected ? 12 : 8) + Math.min(8, (c.report_count - 1) * 2)}
-              pathOptions={{ color: colour, fillColor: colour, fillOpacity: isSelected ? 0.9 : 0.6, weight: isSelected ? 3 : 1 }}
+              position={[c.lat!, c.lon!]}
+              icon={pinIcon(c, isSelected)}
+              zIndexOffset={isSelected ? 1000 : c.is_emergency ? 500 : 0}
+              title={`${c.tracking_id}: ${c.summary_en}`}
+              alt={`${c.tracking_id}, ${CATEGORY[c.category]?.label ?? c.category}`}
               eventHandlers={{ click: () => onSelect?.(c.tracking_id) }}
             >
               <Popup>
@@ -58,7 +73,7 @@ export function ComplaintMap({ complaints, selected, onSelect, height = "100%", 
                 <br />
                 <a href={`/c/${c.tracking_id}`}>Open complaint</a>
               </Popup>
-            </CircleMarker>
+            </Marker>
           );
         })}
         <FlyTo target={target} />
