@@ -18,7 +18,7 @@ from collections import deque
 import httpx
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 
-from app.channels.chat import WELCOME, ChatClerk, Incoming
+from app.channels.chat import COULD_NOT_FETCH, TOO_LONG, WELCOME, ChatClerk, Incoming
 from app.settings import get_settings
 
 log = logging.getLogger(__name__)
@@ -27,9 +27,7 @@ router = APIRouter(tags=["telegram"])
 API = "https://api.telegram.org"
 MAX_VOICE_S = 30  # Sarvam hears up to ~30 s in one request
 MAX_FILE_BYTES = 5_000_000
-TOO_LONG = ("ದಯವಿಟ್ಟು 30 seconds ಒಳಗಿನ voice message ಕಳಿಸಿ. / "
-            "Please keep voice notes under 30 seconds.")
-COULD_NOT_FETCH = "ಕ್ಷಮಿಸಿ, ಅದನ್ನು ತೆರೆಯಲು ಆಗಲಿಲ್ಲ. / Sorry, I couldn't open that. Could you send it again?"
+
 
 clerk = ChatClerk("telegram")
 _seen: deque[int] = deque(maxlen=2000)  # recent update_ids, to ignore Telegram's resends

@@ -49,6 +49,9 @@ HOW_TO = ("ದಯವಿಟ್ಟು text, voice message, photo ಅಥವಾ loca
           "Please send text, a voice note, a photo or your location.")
 PHOTO_ADDED = ("ನಿಮ್ಮ photo {tid} complaint ಗೆ ಸೇರಿಸಲಾಗಿದೆ. / Your photo was added to complaint {tid}. "
                "If it shows a different problem, tell me about it.")
+TOO_LONG = ("ದಯವಿಟ್ಟು 30 seconds ಒಳಗಿನ voice message ಕಳಿಸಿ. / "
+            "Please keep voice notes under 30 seconds.")
+COULD_NOT_FETCH = "ಕ್ಷಮಿಸಿ, ಅದನ್ನು ತೆರೆಯಲು ಆಗಲಿಲ್ಲ. / Sorry, I couldn't open that. Could you send it again?"
 
 
 @dataclass
