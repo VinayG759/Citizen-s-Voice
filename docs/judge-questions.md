@@ -214,9 +214,10 @@ We have not compared our accuracy or speed with theirs.
 **29. What's really built versus planned?**
 Built and tested: the phone line (a few real calls), the browser page, the Gemma clerk with its five
 tools, the live dashboard and map, duplicate merging, offices, deadlines, overdue status, the
-scorecard, officer actions, the fix-photo check by Gemma, sensitive reports, and (tested with fakes
-only) Telegram and WhatsApp chats with photos, voice notes and location pins, and the call-back after
-a fix.
+scorecard, officer actions, the fix-photo check by Gemma, sensitive reports, and Telegram chat: a
+real typed complaint (English) and a real voice-note complaint (Kannada) were filed end to end on
+17 Oct. Tested with fakes only so far: photos and location pins in chat, WhatsApp, and the call-back
+after a fix.
 **Not built yet:** sending complaints into government systems, per-officer accounts, notifications
 for overdue complaints, cost logging, load testing, and WhatsApp messages outside its 24-hour window. The sample complaints on the dashboard are demo data. The complaint filed
 on stage is real.
