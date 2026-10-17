@@ -79,7 +79,10 @@ def answer(caller="+919876543210", uuid="call-1"):
     return client.post("/api/phone/answer", data={"CallUUID": uuid, "From": caller, "To": "+918065356055"})
 
 
-def test_answer_streams_audio_with_a_one_time_token():
+def test_answer_streams_audio_with_a_one_time_token(monkeypatch):
+    # Without a configured public address the stream address comes from the request's Host header;
+    # a PUBLIC_BASE_URL in the developer's .env must not change what this test sees.
+    monkeypatch.setattr(phone_api.get_settings(), "public_base_url", "")
     r = answer()
     assert r.headers["content-type"].startswith("application/xml")
     assert 'bidirectional="true"' in r.text and "audio/x-l16;rate=16000" in r.text

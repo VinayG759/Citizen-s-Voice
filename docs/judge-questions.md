@@ -82,9 +82,7 @@ real phone calls worked (the first real call filed complaint CV-1004 in 5 turns)
 measured accuracy over a large set of real callers. Places come from 26,935 OpenStreetMap entries
 covering all of Bengaluru: 16,135 have Kannada names, 16,253 have everyday names like "Majestic", and
 there are 2,350 named campus gates and 4,298 roads (so a pin can sit on the road the caller names).
-Matching tolerates misspellings, and the read-back catches mistakes. **Known weakness, found 17 Oct:**
-a bare name shared by several places ("Koramangala", "Indiranagar") can pick the wrong one. Fix in
-progress.
+Matching tolerates misspellings, and the read-back catches mistakes. **Weakness found and fixed 17 Oct:** a bare name shared by several places ("Koramangala", "Indiranagar") used to pick the wrong one. Now the suburb beats a same-named village, ties go to the one nearer central Bengaluru, and far-apart namesakes are both offered so the caller can choose. Covered by tests. Not yet re-measured on real calls.
 
 ## Speed and cost
 

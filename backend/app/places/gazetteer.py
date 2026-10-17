@@ -110,8 +110,16 @@ _GENERIC = {"railway", "station", "bus", "stand", "stop", "hospital", "clinic", 
             "primary", "high", "new", "old", "town", "main", "cross", "road", "nagar", "extension"}
 
 
-_KIND_RANK = {"village": 0, "town": 0, "suburb": 0, "neighbourhood": 0, "locality": 0, "quarter": 0, "hamlet": 0,
+# On an exact tie in score, which kind of place the caller most likely means: a suburb or town
+# ("Koramangala", "Indiranagar") before a neighbourhood or village that happens to share the name.
+_KIND_RANK = {"suburb": 0, "town": 0, "neighbourhood": 1, "locality": 1, "quarter": 1, "village": 1, "hamlet": 1,
               "gate": 1, "bus_stop": 3, "road": 4}
+
+CITY_CENTRE = (12.9716, 77.5946)  # on a tie, the namesake nearer the middle of Bengaluru wins
+SAME_PLACE_KM = 2.0  # two results with one name closer than this are one place; farther apart, both are shown
+# Everyday and former names ("Yelahanka Bus Station") are looser than the official name: on a tie the
+# official name wins. Small enough that "Majestic" still finds Kempegowda Bus Station.
+ALT_NAME_PENALTY = 4
 
 
 # Words that say what KIND of place the caller means: matching kinds get a boost.
@@ -137,7 +145,8 @@ def _score(query: str, place: Place) -> float:
     if not q:
         return 0.0
     best = 0.0
-    for name in (place.name_en, place.name_kn, *place.alt.split("|")):
+    names = [(place.name_en, False), (place.name_kn, False), *((a, True) for a in place.alt.split("|"))]
+    for name, is_alt in names:
         if not name:
             continue
         n = normalise(name)
@@ -173,7 +182,7 @@ def _score(query: str, place: Place) -> float:
         # even when the caller said exactly that; a real name ("Yelahanka New Town") is fine.
         if set(n.split()) <= _GENERIC and _name_counts().get(n, 0) > 1:
             s -= 15
-        best = max(best, s)
+        best = max(best, s - (ALT_NAME_PENALTY if is_alt else 0))
     return best
 
 
@@ -256,14 +265,17 @@ def find(query: str, area: str | None = None, limit: int = 3) -> list[Match]:
 
     # Rank on the uncapped score, so two "100"s still come out in the right order; on a tie, an
     # area beats a landmark beats a bus stop beats a road, then alphabetical — never by chance.
-    scored = [m for _, m in sorted(scored, key=lambda x: (-x[0], _KIND_RANK.get(x[1].place.kind, 2), x[1].place.label))]
+    scored = [m for _, m in sorted(scored, key=lambda x: (
+        -x[0], _KIND_RANK.get(x[1].place.kind, 2),
+        km_between(*CITY_CENTRE, x[1].place.lat, x[1].place.lon), x[1].place.label))]
     out: list[Match] = []
-    seen: set[str] = set()
     for m in scored:
-        key = m.place.label.lower()
-        if m.score < MIN_SCORE or key in seen:
+        if m.score < MIN_SCORE:
             continue
-        seen.add(key)
+        # One name, one place — unless the namesakes are far apart (two different Koramangalas).
+        if any(o.place.label.lower() == m.place.label.lower() and
+               km_between(o.place.lat, o.place.lon, m.place.lat, m.place.lon) < SAME_PLACE_KM for o in out):
+            continue
         out.append(m)
         if len(out) == limit:
             break

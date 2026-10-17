@@ -17,9 +17,9 @@ below has **not** been run end to end yet. Rehearse it on the real line before j
 | Tabs open | Tab 1: dashboard (`/`). Tab 2: `/try`. Tab 3: the backup video, paused at 0:00 | Switching tabs is faster than typing addresses |
 | Phones | Your phone charged, speaker tested; a second phone with a different number as backup; mobile hotspot on | The line allows 5 calls per hour per number. Don't burn them rehearsing in the last hour |
 
-**Place names that work reliably:** Jayanagar 4th Block, Hebbal, Malleswaram, Rajajinagar, Basavanagudi,
-HSR Layout, Whitefield, Koramangala 5th Block. **Don't say just "Koramangala" or "Indiranagar"** on stage:
-today they resolve to the wrong place with the same name (known bug, being fixed).
+**Place names checked on 17 Oct:** Jayanagar 4th Block, Hebbal, Malleswaram, Rajajinagar, Basavanagudi,
+HSR Layout, Whitefield, Koramangala (and 5th Block), Indiranagar, Yelahanka New Town. A bare "Koramangala" used to pin
+a village 40 km away; fixed 17 Oct (it now picks the suburb and also offers the namesake, so the clerk may ask which).
 
 ---
 
