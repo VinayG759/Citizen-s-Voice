@@ -70,6 +70,8 @@ export type ShellState = {
   config: Config | null;
   list: List;
   reload: () => void;
+  /** Goes up whenever the list changed (a filing, an update, a sign-in change, Try again): a page showing its own copy fetches again. */
+  version: number;
   scores: ScoreRow[] | null;
   selected: string | null;
   select: (trackingId: string | null) => void;

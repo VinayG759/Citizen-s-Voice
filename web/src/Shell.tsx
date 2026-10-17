@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Building2 } from "lucide-react";
 import { EmptyState } from "./components/EmptyState";
 import { MobileBar, Sidebar, currentPage } from "./components/Sidebar";
@@ -44,6 +44,7 @@ export function Shell() {
   const [selected, setSelected] = useState<string | null>(null);
   const [fresh, setFresh] = useState<Set<string>>(new Set());
   const [call, setCall] = useState<LiveCall | null>(null);
+  const [version, setVersion] = useState(0);
   const isOfficer = useOfficer();
   const emerging = useResource<Emerging>("/api/emerging?headlines=true");
   const brief = useResource<Brief>("/api/brief");
@@ -57,7 +58,7 @@ export function Shell() {
     }
   }, []);
 
-  const reload = useCallback(async () => {
+  const load = useCallback(async () => {
     setList({ state: "loading" });
     try {
       setList({ state: "ok", items: await getJson<Complaint[]>("/api/complaints?sort=newest") });
@@ -67,11 +68,23 @@ export function Shell() {
     getJson<ScoreRow[]>("/api/scorecard").then(setScores, () => setScores(null));
   }, []);
 
+  // "Try again" and the like: load the list again, and tell pages that keep their own copy to do the same.
+  const reload = useCallback(() => {
+    setVersion((v) => v + 1);
+    return load();
+  }, [load]);
+
+  // Signing in or out changes what is shown (sensitive reports): load again, and tell pages with their own copy.
+  const wasOfficer = useRef(isOfficer);
   useEffect(() => {
     void recheck();
-    void reload();
+    void load();
     getJson<Config>("/api/config").then(setConfig, () => setConfig(null));
-  }, [recheck, reload, isOfficer]); // signing in or out changes what is shown (sensitive reports)
+    if (wasOfficer.current !== isOfficer) {
+      wasOfficer.current = isOfficer;
+      setVersion((v) => v + 1);
+    }
+  }, [recheck, load, isOfficer]);
 
   // The brief is for officers: signing out forgets it.
   const forgetBrief = brief.reset;
@@ -112,9 +125,10 @@ export function Shell() {
       const c = await getJson<Complaint>(`/api/complaints/${trackingId}`);
       setList((l) => (l.state === "ok" ? { ...l, items: [c, ...l.items.filter((x) => x.tracking_id !== c.tracking_id)] } : l));
       setFresh((f) => new Set(f).add(c.tracking_id));
+      setVersion((v) => v + 1);
       toast.success(`New complaint ${c.tracking_id}: ${c.summary_en}`);
     } catch {
-      void reload();
+      void load();
     }
   }
 
@@ -122,6 +136,7 @@ export function Shell() {
     try {
       const c = await getJson<Complaint>(`/api/complaints/${trackingId}`);
       setList((l) => (l.state === "ok" ? { ...l, items: l.items.map((x) => (x.tracking_id === c.tracking_id ? c : x)) } : l));
+      setVersion((v) => v + 1);
       getJson<ScoreRow[]>("/api/scorecard").then(setScores, () => undefined);
     } catch {
       /* the next full load catches up */
@@ -130,11 +145,11 @@ export function Shell() {
 
   const state: ShellState = useMemo(
     () => ({
-      status, recheck, live, config, list, reload, scores, selected, select: setSelected, fresh, call, isOfficer,
+      status, recheck, live, config, list, reload, version, scores, selected, select: setSelected, fresh, call, isOfficer,
       emerging: { resource: emerging.resource, ensure: emerging.ensure, refresh: emerging.refresh },
       brief: { resource: brief.resource, ensure: brief.ensure, refresh: brief.refresh },
     }),
-    [status, recheck, live, config, list, reload, scores, selected, fresh, call, isOfficer, emerging, brief],
+    [status, recheck, live, config, list, reload, version, scores, selected, fresh, call, isOfficer, emerging, brief],
   );
 
   const Page = PAGES[pathname];

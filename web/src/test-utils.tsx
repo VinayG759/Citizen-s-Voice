@@ -14,6 +14,7 @@ export const CV1004 = {
 export const healthy = { status: "ok", db: "ok", version: "0.1.0" };
 export const config = { helpline_number: "+918065356055", helpline_display: "080 6535 6055" };
 export const NEWEST = "/api/complaints?sort=newest";
+export const PRIORITY = "/api/complaints?sort=priority";
 
 /** Answers each address with the body given for it; an Error is a network failure, anything unlisted is a 404. */
 export function mockFetch(routes: Record<string, unknown | Error>): Mock {

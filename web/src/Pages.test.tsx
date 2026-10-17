@@ -1,6 +1,6 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, vi } from "vitest";
-import { CV1004, FakeEventSource, NEWEST, config, fetched, healthy, mockFetch, renderAt } from "./test-utils";
+import { CV1004, FakeEventSource, NEWEST, PRIORITY, config, fetched, healthy, mockFetch, renderAt } from "./test-utils";
 
 vi.mock("./components/ComplaintMap", () => ({
   ComplaintMap: ({ selected, complaints }: { selected?: string | null; complaints: unknown[] }) => (
@@ -180,4 +180,26 @@ test("the phone menu opens, closes on Escape and returns focus to its button", a
   fireEvent.click(within(screen.getByRole("dialog", { name: "Menu" })).getByRole("link", { name: "Offices" }));
   expect(await screen.findByRole("heading", { name: "Offices" })).toBeInTheDocument();
   expect(screen.queryByRole("dialog", { name: "Menu" })).not.toBeInTheDocument(); // choosing a page closes it
+});
+
+test("a complaint filed while sorted by urgency appears, where the server ranks it", async () => {
+  const wire = { ...CV1004, tracking_id: "CV-5000", summary_en: "Live wire down", is_emergency: true };
+  const routes: Record<string, unknown> = {
+    "/health": healthy, "/api/config": config, [NEWEST]: [road], [PRIORITY]: [road], "/api/complaints/CV-5000": wire,
+  };
+  const fetchMock = mockFetch(routes);
+  renderAt("/complaints?sort=priority");
+  expect(await screen.findByText("Pothole on the main road")).toBeInTheDocument();
+  expect(fetched(fetchMock, PRIORITY)).toBe(1);
+
+  routes[PRIORITY] = [wire, road]; // the server now ranks the new emergency first
+  act(() => {
+    FakeEventSource.last.push({
+      type: "turn", call_id: 9, channel: "phone", caller: "a", reply: "b", steps: [], complaint: { tracking_id: "CV-5000" },
+    });
+  });
+  expect(await screen.findByText("Live wire down")).toBeInTheDocument();
+  expect(fetched(fetchMock, PRIORITY)).toBe(2); // asked again because the list changed
+  const order = screen.getAllByRole("button", { name: /CV-/ }).map((b) => b.textContent);
+  expect(order[0]).toContain("Live wire down");
 });

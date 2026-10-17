@@ -2,7 +2,7 @@ import { Phone, RefreshCw, SearchX } from "lucide-react";
 import { Button } from "./Button";
 import { ComplaintRow, ListSkeleton } from "./ComplaintRow";
 import { EmptyState } from "./EmptyState";
-import { useShell } from "../ShellContext";
+import { useShell, type List } from "../ShellContext";
 import type { Complaint } from "../lib/complaints";
 
 type Props = {
@@ -12,11 +12,15 @@ type Props = {
   /** True when the page is narrowing the list: an empty result then means "nothing matches", not "no complaints". */
   filtered?: boolean;
   onClear?: () => void;
+  /** Where loading and error come from. Default: the shell's list. */
+  source?: List;
 };
 
 /** The complaint list with its loading, error and empty states, shared by the Live desk and Complaints. */
-export function ComplaintFeed({ items, showWhy = false, filtered = false, onClear }: Props) {
-  const { list, reload, config, selected, select, fresh } = useShell();
+export function ComplaintFeed({ items, showWhy = false, filtered = false, onClear, source }: Props) {
+  const shell = useShell();
+  const { reload, config, selected, select, fresh } = shell;
+  const list = source ?? shell.list;
 
   if (list.state === "loading") return <ListSkeleton />;
   if (list.state === "error")

@@ -148,13 +148,6 @@ export function passes(c: Complaint, f: Partial<Filters>, skip?: keyof Filters):
   );
 }
 
-/** "Most urgent first": the server's own rule (app/officer.py rank_key). An open emergency comes before
- *  everything else, then the priority score, which the server computed and shows the working for. */
-export function mostUrgentFirst(a: Complaint, b: Complaint): number {
-  const open = (c: Complaint) => (c.is_emergency && c.status !== "fixed" ? 1 : 0);
-  return open(b) - open(a) || b.priority - a.priority;
-}
-
 export function timeAgo(iso: string, now = Date.now()): string {
   const s = Math.max(0, Math.round((now - new Date(iso).getTime()) / 1000));
   if (s < 60) return "just now";

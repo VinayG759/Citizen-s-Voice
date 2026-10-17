@@ -1,6 +1,6 @@
 import { act, fireEvent, screen } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
-import { CV1004, FakeEventSource, NEWEST, config, healthy, mockFetch, renderAt } from "./test-utils";
+import { CV1004, FakeEventSource, NEWEST, PRIORITY, config, fetched, healthy, mockFetch, renderAt } from "./test-utils";
 
 // The test browser can't draw Leaflet maps; the map gets its own manual check.
 vi.mock("./components/ComplaintMap", () => ({
@@ -75,17 +75,24 @@ test("each complaint says which office it went to; overdue and emergency ones ar
   expect(screen.getByText(/1 open emergency report/)).toBeInTheDocument();
 });
 
-test("most urgent first puts an open emergency first and shows the working behind the order", async () => {
+test("most urgent first shows the server's order untouched, with the working behind it", async () => {
   const wire = { ...CV1004, tracking_id: "CV-1006", summary_en: "Live wire down", is_emergency: true, priority: 8, priority_why: "emergency" };
   const pothole = { ...CV1004, tracking_id: "CV-1007", summary_en: "Old pothole", priority: 83, priority_why: "urgency 4 · 4 reports" };
-  mockFetch({ "/health": healthy, "/api/config": config, [NEWEST]: [pothole, wire] });
+  // The browser must not re-rank: whatever order the server sends (the rule lives in officer.rank_key) is the order shown.
+  // This order is deliberately NOT what a score-only sort would give, to prove nothing is re-sorted here.
+  const fetchMock = mockFetch({
+    "/health": healthy, "/api/config": config, [NEWEST]: [wire, pothole], [PRIORITY]: [pothole, wire],
+  });
   renderAt("/complaints");
   await screen.findByText("Old pothole");
   expect(screen.queryByText(/Why here/)).not.toBeInTheDocument();
+  expect(fetched(fetchMock, PRIORITY)).toBe(0);
   fireEvent.click(screen.getByRole("button", { name: "Most urgent first" }));
-  expect(await screen.findByText("Why here: emergency")).toBeInTheDocument();
+  expect(await screen.findByText("Why here: urgency 4 · 4 reports")).toBeInTheDocument();
+  expect(fetched(fetchMock, PRIORITY)).toBe(1);
   const order = screen.getAllByRole("button", { name: /CV-100/ }).map((b) => b.textContent);
-  expect(order[0]).toContain("Live wire down");
+  expect(order[0]).toContain("Old pothole");
+  expect(order[1]).toContain("Live wire down");
   expect(window.location.search).toBe("?sort=priority");
 });
 
