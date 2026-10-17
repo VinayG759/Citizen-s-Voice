@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app import events
 from app.api import complaints, phone, try_it
+from app.channels import telegram
 from app.db.session import database_is_up
 from app.phone.call import warm_clips
 from app.settings import get_settings
@@ -63,6 +64,7 @@ def public_config() -> dict:
 app.include_router(try_it.router)
 app.include_router(phone.router)
 app.include_router(complaints.router)
+app.include_router(telegram.router)
 
 # API routers are included ABOVE this line: the dashboard catch-all below must
 # be registered last, or it would swallow API addresses.
