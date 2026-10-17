@@ -34,6 +34,17 @@ def test_emergencies_get_one_day_and_top_priority():
     assert e["overdue"] and e["priority"] > normal["priority"] and e["priority_why"].startswith("emergency")
 
 
+def test_an_open_emergency_always_ranks_first(monkeypatch):
+    # The case found with the demo data: a 10-day-old pothole with 4 reports scored above a fresh live wire.
+    pothole = complaint(tracking_id="CV-1001", urgency=4, report_count=4, created_at=days_ago(10))
+    wire = complaint(tracking_id="CV-1002", is_emergency=True, urgency=5, created_at=days_ago(0))
+    fixed_wire = complaint(tracking_id="CV-1003", is_emergency=True, status="fixed", created_at=days_ago(1))
+    assert officer.follow_up(pothole)["priority"] > officer.follow_up(wire)["priority"]
+    monkeypatch.setattr(api.repo, "list_complaints", lambda *a: [pothole, fixed_wire, wire])
+    order = [c["tracking_id"] for c in client.get("/api/complaints?sort=priority").json()]
+    assert order == ["CV-1002", "CV-1001", "CV-1003"]
+
+
 def test_fixed_complaints_drop_to_the_bottom():
     f = officer.follow_up(complaint(status="fixed", created_at=days_ago(30)))
     assert f["priority"] == 0 and not f["overdue"]

@@ -118,3 +118,9 @@ def follow_up(c: dict, now: datetime | None = None) -> dict:
         "priority": score,
         "priority_why": " · ".join(why),
     }
+
+
+def rank_key(c: dict) -> tuple[bool, int]:
+    """Sort key for "most urgent first" (use with reverse=True): an open emergency always comes before
+    anything else, however old or often-reported; then the priority score."""
+    return (bool(c.get("is_emergency")) and c["status"] != "fixed", c["priority"])

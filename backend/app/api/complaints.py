@@ -49,7 +49,7 @@ def complaints(
         raise HTTPException(422, "unknown office")
     items = [_with_follow_up(c) for c in repo.list_complaints(limit, officer.is_officer(authorization), department)]
     if sort == "priority":
-        items.sort(key=lambda c: c["priority"], reverse=True)
+        items.sort(key=officer.rank_key, reverse=True)
     return items
 
 
