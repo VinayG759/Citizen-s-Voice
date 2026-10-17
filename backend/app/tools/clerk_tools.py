@@ -122,11 +122,24 @@ def find_place(state: ToolState, query: str, area: str | None = None, road: str 
         state.offered.setdefault(m.place.id, OfferedPlace(m.place, state.caller_turn))
     if not matches:
         return {"matches": [], "note": "No such place found. Ask for a nearby landmark, bus stop or road name."}
+    out = []
+    for m in matches:
+        d = {"id": m.place.id, "name": m.place.label, "name_kn": m.place.name_kn,
+             "kind": m.place.kind, "confidence": round(m.score)}
+        if m.distance_km_from_area is not None:
+            d["km_from_area"] = round(m.distance_km_from_area, 1)
+        out.append(d)
+    if area and matches[0].distance_km_from_area is not None and matches[0].distance_km_from_area > gazetteer.NEAR_KM:
+        # Tester's report, 17 Oct: the caller's own words were read back ("St. Mary's School, Dasarahalli")
+        # and confirmed, while the pin sat 15 km away. Never read back a place outside the caller's area.
+        return {"matches": out,
+                "note": f"None of these is in {area}: the nearest is {round(matches[0].distance_km_from_area)} km "
+                        "away. Do not read these back. Ask for a nearby landmark, bus stop or road in "
+                        f"{area}, then search again."}
     return {
-        "matches": [{"id": m.place.id, "name": m.place.label, "name_kn": m.place.name_kn,
-                     "kind": m.place.kind, "confidence": round(m.score)} for m in matches],
-        "note": "If the first match fits what the caller said, read it back for a yes/no. "
-                "Ask the caller to choose only if the matches are genuinely different places.",
+        "matches": out,
+        "note": "If the first match fits what the caller said, read it back for a yes/no, using its name "
+                "as given here. Ask the caller to choose only if the matches are genuinely different places.",
     }
 
 

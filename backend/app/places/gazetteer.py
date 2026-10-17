@@ -219,37 +219,68 @@ def _name_counts() -> dict[str, int]:
     return counts
 
 
+def _distinctive_match(query: str, place: Place) -> float:
+    """How well the caller's distinctive words ("St Mary's", not "school") appear in the place's
+    names. "St. Mary's School" is fully inside "Schoenstatt St. Mary's Public School": 100."""
+    q_core = [w for w in normalise(query).split() if w not in _GENERIC]
+    if not q_core:
+        return 0.0
+    best = 0.0
+    for name in (place.name_en, place.name_kn, *place.alt.split("|")):
+        n_core = [w for w in normalise(name).split() if w not in _GENERIC]
+        if n_core:
+            best = max(best, fuzz.token_set_ratio(" ".join(q_core), " ".join(n_core)))
+    return best
+
+
+def area_centres(area: str) -> list[Place]:
+    """Every place the area's name could mean. "Dasarahalli" is three different places in
+    Bengaluru (Hebbal, Magadi Road, T. Dasarahalli): being near any of them counts as "in" it."""
+    hits = [(p, _score(area, p)) for p in _candidates(area)]
+    # A road is a long line, not an area: its stored point says little about where "there" is.
+    hits = [h for h in hits if h[0].kind != "road"] or hits
+    best = max((s for _, s in hits), default=0.0)
+    if best < 75:
+        return []
+    return [p for p, s in hits if s >= best - 0.5]
+
+
 def find(query: str, area: str | None = None, limit: int = 3) -> list[Match]:
-    """Best matches for `query`; if `area` is given, places near that area rank higher."""
+    """Best matches for `query`; if `area` is given, places in that area come first."""
     places = load()
-    centre = None
+    centres: list[Place] = []
     # Gemma sometimes passes the place itself as the area ("Dasahalli" near "Dasahalli"):
     # that would boost whatever matched first, right or wrong. Only a different area counts.
     if area and fuzz.ratio(normalise(area), normalise(query)) >= 85:
         area = None
     if area:
-        area_hits = sorted(_candidates(area), key=lambda p: _score(area, p), reverse=True)[:1]
-        if area_hits and _score(area, area_hits[0]) >= 75:
-            centre = area_hits[0]
+        centres = area_centres(area)
+
+    def km_from_area(p: Place) -> float | None:
+        return min(km_between(c.lat, c.lon, p.lat, p.lon) for c in centres) if centres else None
 
     kinds = _wanted_kinds(query)
     # "The railway station" / "the hospital" + an area: the caller means the nearest one of that
     # kind in that area, not some place literally named "Railway Station".
-    if centre is not None and kinds and set(normalise(query).split()) <= _GENERIC:
-        near = sorted(
-            (Match(p, 90.0, km_between(centre.lat, centre.lon, p.lat, p.lon)) for p in places if p.kind in kinds),
-            key=lambda m: m.distance_km_from_area,
-        )
+    if centres and kinds and set(normalise(query).split()) <= _GENERIC:
+        near = sorted((Match(p, 90.0, km_from_area(p)) for p in places if p.kind in kinds),
+                      key=lambda m: m.distance_km_from_area)
         near = [m for m in near if m.distance_km_from_area <= NEAR_KM][:limit]
         if near:
             return near
 
-    scored: list[tuple[float, Match]] = []
+    scored: list[tuple[bool, float, Match]] = []
     for p in _candidates(query):
         s = _score(query, p)
-        if s < MIN_SCORE:  # bonuses below only help names that already match well
+        dist = km_from_area(p)
+        # In the area the caller named, with the caller's distinctive words in its name: this is
+        # almost certainly the place, even if its full name is longer ("Schoenstatt St. Mary's Public
+        # School" for "St. Mary's School, Dasarahalli"). Real call, 17 Oct: the exact name "St. Mary's
+        # School" 15 km away in Kothanur won instead.
+        in_area = (dist is not None and dist <= NEAR_KM and _distinctive_match(query, p) >= 90
+                   and (not kinds or p.kind in kinds or p.kind == "gate"))  # a school, not St. Mary's Church
+        if s < MIN_SCORE and not in_area:  # bonuses below only help names that already match well
             continue
-        dist = km_between(centre.lat, centre.lon, p.lat, p.lon) if centre else None
         if dist is not None:
             if dist <= NEAR_KM:
                 s += 10
@@ -261,13 +292,14 @@ def find(query: str, area: str | None = None, limit: int = 3) -> list[Match]:
             s -= 8  # "X gate": the gate itself, not the middle of X
         if p.kind == "road":
             s -= 3  # prefer a landmark over a long road with the same name
-        scored.append((s, Match(p, min(s, 100.0), dist)))
+        scored.append((in_area, s, Match(p, min(s, 100.0), dist)))
 
-    # Rank on the uncapped score, so two "100"s still come out in the right order; on a tie, an
-    # area beats a landmark beats a bus stop beats a road, then alphabetical — never by chance.
-    scored = [m for _, m in sorted(scored, key=lambda x: (
-        -x[0], _KIND_RANK.get(x[1].place.kind, 2),
-        km_between(*CITY_CENTRE, x[1].place.lat, x[1].place.lon), x[1].place.label))]
+    # Places in the named area first. Then rank on the uncapped score, so two "100"s still come out
+    # in the right order; on a tie, an area beats a landmark beats a bus stop beats a road, then
+    # alphabetical — never by chance.
+    scored = [m for _, _, m in sorted(scored, key=lambda x: (
+        not x[0], -x[1], _KIND_RANK.get(x[2].place.kind, 2),
+        km_between(*CITY_CENTRE, x[2].place.lat, x[2].place.lon), x[2].place.label))]
     out: list[Match] = []
     for m in scored:
         if m.score < MIN_SCORE:

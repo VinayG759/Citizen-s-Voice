@@ -13,7 +13,6 @@ def top(query, area=None):
 @pytest.mark.parametrize("query,area,expected", [
     ("Dasahalli", "Dasahalli", "Dasarahalli"),  # real call: was matched to Chowdanahalli
     ("ದಾಸಹಳ್ಳಿ", None, "Dasarahalli"),
-    ("St. Mary's School", "Dasarahalli", "St. Mary's School"),  # not "St Ann's" / "…Primary School"
     ("Presidency University gate", "Rajankunte", "Presidency University"),
     ("Rajan kunte", None, "Rajanukunte"),
     ("ರಾಜನಕುಂಟೆ", None, "Rajanukunte"),
@@ -25,6 +24,38 @@ def top(query, area=None):
 def test_the_right_place_comes_first(query, area, expected):
     # OpenStreetMap spells Rajanukunte two ways (village vs bus stop); both are the right place.
     assert expected in top(query, area) or (expected == "Rajanukunte" and top(query, area) == "Rajanakunte")
+
+
+T_DASARAHALLI = (13.0433, 77.5126)  # Dasarahalli metro station, Tumkur Road
+
+
+@pytest.mark.parametrize("query,area", [
+    ("St. Mary's School", "Dasarahalli"),
+    ("St Mary's Public School", "T. Dasarahalli"),
+])
+def test_a_school_in_the_named_area_beats_the_same_name_far_away(query, area):
+    # Tester's report, 17 Oct: "St. Mary's School, Dasarahalli" pinned the St. Mary's School in Kothanur,
+    # 15 km east. The real one is "Schoenstatt St. Mary's Public School", 1.4 km from the metro.
+    m = g.find(query, area)[0].place
+    assert "St" in m.label and "Mary" in m.label and m.kind == "school"
+    assert g.km_between(m.lat, m.lon, *T_DASARAHALLI) < 2
+
+
+def test_every_namesake_of_the_area_counts():
+    # "Dasarahalli" is three places; the area isn't just whichever one sorts first.
+    centres = g.area_centres("Dasarahalli")
+    assert any(g.km_between(p.lat, p.lon, *T_DASARAHALLI) < 1 for p in centres)
+    assert any(g.km_between(p.lat, p.lon, *T_DASARAHALLI) > 8 for p in centres)  # Hebbal's Dasarahalli too
+
+
+def test_the_area_does_not_override_the_place_kind():
+    assert all(m.place.kind != "place_of_worship" for m in g.find("St. Mary's School", "Dasarahalli")[:2])
+
+
+def test_a_place_outside_the_named_area_is_not_read_back():
+    from app.tools import clerk_tools
+    out = clerk_tools.find_place(clerk_tools.ToolState(), "Hebbal Flyover", "Rajanukunte")
+    assert out["matches"][0]["km_from_area"] > g.NEAR_KM and "Do not read these back" in out["note"]
 
 
 def test_gibberish_finds_nothing():
