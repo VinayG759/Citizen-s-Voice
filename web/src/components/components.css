@@ -106,6 +106,17 @@
   margin-bottom: var(--space-3);
 }
 
+/* Phones: fingers need 40px targets, and every pixel of width counts. */
+@media (max-width: 600px) {
+  .btn--sm,
+  .input--sm {
+    min-height: 40px;
+  }
+  .card {
+    padding: var(--space-4);
+  }
+}
+
 /* Empty state */
 .empty {
   display: flex;
