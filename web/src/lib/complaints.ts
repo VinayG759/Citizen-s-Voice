@@ -61,11 +61,28 @@ export type PhotoMeta = {
   at: string;
 };
 
+export type TranscriptLine = { speaker: "caller" | "clerk"; text: string; language: string | null; at: string };
+
+/** Another person who reported the same problem: their own details and words. */
+export type LinkedReport = {
+  channel: Complaint["channel"];
+  language: string | null;
+  caller_last4: string | null;
+  summary_en: string;
+  summary_local: string | null;
+  place_name: string | null;
+  landmark: string | null;
+  since_when: string | null;
+  created_at: string;
+  transcript: TranscriptLine[];
+};
+
 export type ComplaintDetail = Complaint & {
   timeline: TimelineEntry[];
   photos: PhotoMeta[];
-  transcript: { speaker: "caller" | "clerk"; text: string; language: string | null; at: string }[];
+  transcript: TranscriptLine[];
   steps: ClerkEvent[];
+  linked_reports?: LinkedReport[];
 };
 
 /** Same word for the same thing everywhere (UI rule 1). */

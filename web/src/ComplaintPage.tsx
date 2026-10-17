@@ -17,7 +17,9 @@ import {
   urgencyLabel,
   urgencyTone,
   type ComplaintDetail,
+  type LinkedReport,
   type PhotoMeta,
+  type TranscriptLine,
 } from "./lib/complaints";
 import { describe } from "./lib/steps";
 import { toast } from "./lib/toast";
@@ -83,9 +85,72 @@ export function ComplaintPage({ trackingId }: { trackingId: string }) {
   );
 }
 
+const when = (iso: string) => new Date(iso).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+
+function reporter(r: Pick<LinkedReport, "channel" | "caller_last4" | "language">) {
+  return (
+    (CHANNEL_LABEL[r.channel] ?? r.channel) +
+    (r.caller_last4 ? ` · number ending ${r.caller_last4}` : "") +
+    (r.language ? ` · ${LANGUAGE[r.language.split("-")[0]] ?? r.language}` : "")
+  );
+}
+
+function Transcript({ lines }: { lines: TranscriptLine[] }) {
+  if (lines.length === 0) return <p className="live__none">No conversation recorded.</p>;
+  return (
+    <ol className="chat">
+      {lines.map((t, i) => (
+        <li key={i} className={`chat__line chat__line--${t.speaker}`}>
+          <span className="chat__who">{t.speaker === "caller" ? "Caller" : "Clerk (Gemma 4)"}</span>
+          <p className="chat__text">{t.text}</p>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** Everyone else who reported the same problem, in their own words: the details above are the
+ * FIRST report's, so without this a later reporter's chat looks like it was replaced by someone else's. */
+function LinkedReports({ reports, hidden }: { reports: LinkedReport[]; hidden: boolean }) {
+  return (
+    <Card title={`Also reported by ${reports.length} more ${reports.length === 1 ? "person" : "people"}`}>
+      <ol className="linked">
+        {reports.map((r, i) => (
+          <li key={i} className="linked__item">
+            <p className="linked__who">
+              <strong>Report {i + 2}</strong> · {reporter(r)} · {when(r.created_at)}
+            </p>
+            {!hidden && (
+              <>
+                <p className="detail__summary">{r.summary_en}</p>
+                {r.summary_local && <p className="detail__local">{r.summary_local}</p>}
+                <dl className="facts">
+                  <dt>Place</dt>
+                  <dd>
+                    {r.place_name ?? "Unknown"}
+                    {r.landmark ? ` (${r.landmark})` : ""}
+                  </dd>
+                  <dt>Since</dt>
+                  <dd>{r.since_when ?? "Not said"}</dd>
+                </dl>
+                <details className="linked__chat">
+                  <summary>Their conversation</summary>
+                  <Transcript lines={r.transcript} />
+                </details>
+              </>
+            )}
+          </li>
+        ))}
+      </ol>
+    </Card>
+  );
+}
+
 function Detail({ c, officer, onChanged }: { c: ComplaintDetail; officer: boolean; onChanged: () => void }) {
   const Icon = CATEGORY[c.category]?.icon ?? CATEGORY.other.icon;
-  const filed = new Date(c.created_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+  const filed = when(c.created_at);
+  const linked = c.linked_reports ?? [];
+  const hidden = c.sensitive && !officer;
   return (
     <div className="detail__grid">
       <div className="detail__main">
@@ -116,14 +181,16 @@ function Detail({ c, officer, onChanged }: { c: ComplaintDetail; officer: boolea
             </dd>
             <dt>Since</dt>
             <dd>{c.since_when ?? "Not said"}</dd>
-            <dt>Reported by</dt>
-            <dd>
-              {CHANNEL_LABEL[c.channel] ?? c.channel}
-              {c.caller_last4 ? ` · number ending ${c.caller_last4}` : ""}
-              {c.language ? ` · ${LANGUAGE[c.language.split("-")[0]] ?? c.language}` : ""}
-            </dd>
+            <dt>{linked.length ? "First reported by" : "Reported by"}</dt>
+            <dd>{reporter(c)}</dd>
             <dt>Filed</dt>
             <dd>{filed}</dd>
+            {linked.length > 0 && (
+              <>
+                <dt>Reports</dt>
+                <dd>{linked.length + 1} people · the details above are the first report's, the others are below</dd>
+              </>
+            )}
           </dl>
         </Card>
 
@@ -153,22 +220,15 @@ function Detail({ c, officer, onChanged }: { c: ComplaintDetail; officer: boolea
 
         {officer && <OfficerActions c={c} onChanged={onChanged} />}
 
-        <Card title="Conversation">
-          {c.sensitive && !officer ? (
+        <Card title={linked.length ? "Conversation (first report)" : "Conversation"}>
+          {hidden ? (
             <p className="live__none">Sensitive report: details are visible only to officers.</p>
-          ) : c.transcript.length === 0 ? (
-            <p className="live__none">No conversation recorded.</p>
           ) : (
-            <ol className="chat">
-              {c.transcript.map((t, i) => (
-                <li key={i} className={`chat__line chat__line--${t.speaker}`}>
-                  <span className="chat__who">{t.speaker === "caller" ? "Caller" : "Clerk (Gemma 4)"}</span>
-                  <p className="chat__text">{t.text}</p>
-                </li>
-              ))}
-            </ol>
+            <Transcript lines={c.transcript} />
           )}
         </Card>
+
+        {linked.length > 0 && <LinkedReports reports={linked} hidden={hidden} />}
       </div>
 
       <div className="detail__side">

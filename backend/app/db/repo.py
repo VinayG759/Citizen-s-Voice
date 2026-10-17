@@ -16,8 +16,8 @@ log = logging.getLogger(__name__)
 
 @dataclass
 class FiledComplaint:
-    id: int
-    tracking_number: int
+    id: int  # the row this conversation created (for a linked report: the report, not the original)
+    tracking_number: int  # the problem's tracking number (for a linked report: the original's)
 
     @property
     def tracking_id(self) -> str:
@@ -107,13 +107,16 @@ class Repo:
             if parent is None:
                 raise LookupError(parent_tracking_number)
             _forget_caller(s, forget_call)
-            s.add(Complaint(duplicate_of=parent.id, **fields))
+            report = Complaint(duplicate_of=parent.id, **fields)
+            s.add(report)
             parent.report_count += 1
             raised = parent.report_count % 3 == 0 and parent.urgency < 5
             if raised:
                 parent.urgency += 1
             s.flush()
-            return FiledComplaint(parent.id, parent.tracking_number), parent.report_count, raised
+            # The conversation links to the report itself, so the complaint page can show each
+            # person's own words (tester's report, 17 Oct: a Telegram report showed the first caller's call).
+            return FiledComplaint(report.id, parent.tracking_number), parent.report_count, raised
 
     def latest_for_caller(self, caller_hash: str) -> ComplaintStatus | None:
         """The caller's most recent complaint (the original, if theirs was a linked report)."""
@@ -184,16 +187,32 @@ def complaint_detail(tracking_number: int, officer: bool = False, show_conversat
         out = public_complaint(c, officer)
         out["timeline"] = timeline(s, c.id)
         out["photos"] = photos_meta(s, c.id)
-        call = s.scalar(select(Call).where(Call.complaint_id == c.id))
+        # The first conversation is the original report's (before 17 Oct, linked reports' calls
+        # pointed here too: the earliest is still the original).
+        call = s.scalar(select(Call).where(Call.complaint_id == c.id).order_by(Call.id).limit(1))
+        talk = officer or (show_conversation and not c.sensitive)
         out["transcript"], out["steps"] = [], []
-        if call is not None and (officer or (show_conversation and not c.sensitive)):
-            out["transcript"] = [
-                {"speaker": t.speaker, "text": t.text_local, "language": t.language, "at": t.created_at.isoformat()}
-                for t in s.scalars(select(Turn).where(Turn.call_id == call.id).order_by(Turn.id))
-            ]
+        if call is not None and talk:
+            out["transcript"] = _transcript(s, call.id)
             out["steps"] = [e.payload for e in s.scalars(
                 select(ClerkEvent).where(ClerkEvent.call_id == call.id).order_by(ClerkEvent.id))]
+        # Everyone else who reported the same problem, each with their own details and words.
+        # (Sensitive reports are never merged, so nothing private appears here.)
+        out["linked_reports"] = []
+        for r in s.scalars(select(Complaint).where(Complaint.duplicate_of == c.id).order_by(Complaint.created_at)):
+            r_call = s.scalar(select(Call).where(Call.complaint_id == r.id).order_by(Call.id).limit(1))
+            out["linked_reports"].append({
+                "channel": r.channel, "language": r.language, "caller_last4": r.caller_last4,
+                "summary_en": r.summary_en, "summary_local": r.summary_local, "place_name": r.place_name,
+                "landmark": r.landmark, "since_when": r.since_when, "created_at": r.created_at.isoformat(),
+                "transcript": _transcript(s, r_call.id) if r_call is not None and talk else [],
+            })
         return out
+
+
+def _transcript(s: Session, call_id: int) -> list[dict]:
+    return [{"speaker": t.speaker, "text": t.text_local, "language": t.language, "at": t.created_at.isoformat()}
+            for t in s.scalars(select(Turn).where(Turn.call_id == call_id).order_by(Turn.id))]
 
 
 # ---- after filing: what happens next ---------------------------------------------------------

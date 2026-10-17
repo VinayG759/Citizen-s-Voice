@@ -194,6 +194,37 @@
   margin: 0;
 }
 
+/* Other people who reported the same problem */
+.linked {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-4);
+}
+
+.linked__item + .linked__item {
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-4);
+}
+
+.linked__who {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-2);
+}
+
+.linked__chat {
+  margin-top: var(--space-3);
+}
+
+.linked__chat summary {
+  cursor: pointer;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+}
+
 /* What happens next: order, deadlines, scorecard, timeline, photos, officer actions */
 .sort {
   display: flex;

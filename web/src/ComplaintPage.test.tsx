@@ -52,6 +52,24 @@ test("anyone can see where a complaint is: office, deadline, timeline and Gemma'
   expect(screen.queryByText("Officer actions")).not.toBeInTheDocument();
 });
 
+test("a second person's report shows their own details and words, not only the first caller's", async () => {
+  // Tester's report, 17 Oct: a Telegram report ("10 years") was added to a phone complaint ("5 years");
+  // the page showed only the phone call, so it looked like the chat had been made up.
+  const second = {
+    channel: "telegram", language: "en-IN", caller_last4: null, summary_en: "Potholes near St. Mary's School for ten years",
+    summary_local: null, place_name: "St. Mary's School", landmark: null, since_when: "10 years",
+    created_at: "2026-10-17T13:38:00+00:00",
+    transcript: [{ speaker: "caller", text: "pothole near St. Mary's school, ten years", language: "en-IN", at: "2026-10-17T13:37:00+00:00" }],
+  };
+  mockFetch({ "/api/complaints/CV-1004": { ...DETAIL, channel: "phone", report_count: 2, linked_reports: [second] } });
+  render(<ComplaintPage trackingId="CV-1004" />);
+  expect(await screen.findByText("Also reported by 1 more person")).toBeInTheDocument();
+  expect(screen.getByText("First reported by")).toBeInTheDocument();
+  expect(screen.getByText("10 years")).toBeInTheDocument();
+  expect(screen.getByText(/Telegram · English/)).toBeInTheDocument();
+  expect(screen.getByText("pothole near St. Mary's school, ten years")).toBeInTheDocument();
+});
+
 test("a sensitive report hides the conversation from the public", async () => {
   mockFetch({ "/api/complaints/CV-1004": { ...DETAIL, sensitive: true } });
   render(<ComplaintPage trackingId="CV-1004" />);
