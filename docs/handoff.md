@@ -1,4 +1,4 @@
-STATUS: waiting for the next Sara
+STATUS: taken over 2026-10-17
 
 > For the next Sara: you are the orchestrator (method in ~/.claude/CLAUDE.md). Vinay runs on Anthropic API credits: keep sessions short. His friend **Tharun** is testing the LIVE site now with a test sheet; Vinay will paste Tharun's report. Start there: triage the report, fix what failed, redeploy.
 
