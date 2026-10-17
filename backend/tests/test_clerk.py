@@ -225,6 +225,24 @@ def test_one_turn_in_another_language_asks_before_switching():
     assert lock.language == "en-IN" and lock.pending is None
 
 
+def test_a_chat_follows_a_change_of_language_at_once_without_asking():
+    # Tester's report, 17 Oct: Kannada, then Hindi, then English on Telegram; each change cost a turn
+    # asking "shall we continue in …?", and the problem was read back again every time.
+    from app.clerk.language import LanguageLock
+    lock = LanguageLock(instant=True)
+    lock.update("kn-IN", "ನಮ್ಮ road ಅಲ್ಲಿ ಹಳ್ಳಗಳು ಇವೆ")
+    assert lock.update("hi-IN", "मैं चाहता हूँ कि यह जल्दी ठीक हो") == "hi-IN" and lock.pending is None
+    assert lock.update("en-IN", "It has been there for ten years") == "en-IN" and lock.pending is None
+    assert lock.update("kn-IN", "ಹೌದು") == "en-IN"  # one word is too short to tell: stays
+    assert lock.update("en-IN", "Kadu Malleshwara Temple ఎదురు here") == "en-IN"
+
+
+def test_a_chat_conversation_uses_the_instant_lock():
+    from app.clerk.clerk import Conversation
+    assert Conversation(call_id=1, repo=None, written=True).lock.instant
+    assert not Conversation(call_id=1, repo=None).lock.instant  # phone calls keep the two-turn rule
+
+
 def test_a_place_name_inside_kannada_is_not_english():
     from app.clerk.language import LanguageLock
     lock = LanguageLock()

@@ -106,6 +106,7 @@ class Conversation:
 
     def __post_init__(self) -> None:
         self.lock.language = self.language  # a conversation started in a language keeps it until told otherwise
+        self.lock.instant = self.written  # a chat follows the citizen's language at once (language.py)
 
     def turn(self, caller_text: str, language: str | None = None) -> TurnResult:
         """One caller turn; the dashboard hears about it as it finishes."""

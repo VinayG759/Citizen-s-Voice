@@ -5,6 +5,10 @@ language — either by naming it ("English", "ಕನ್ನಡ") or just by speak
 stays put: a stray English word, or one misheard sentence, does not flip the call (a real call on
 16 Oct switched language mid-sentence). It changes only if the caller names another language, or
 clearly speaks another language for two turns in a row.
+
+A chat is different: the citizen reads every reply, so a wrong guess costs nothing, while asking
+"shall we continue in Hindi?" at every change cost a turn each time (tester's report, 17 Oct). A chat
+follows a clear change at once and never asks.
 """
 
 import re
@@ -19,6 +23,7 @@ _NAMED = {
     "te-IN": ("telugu", "ತೆಲುಗು", "तेलुगु", "தெலுங்கு", "తెలుగు"),
 }
 SWITCH_AFTER = 2  # turns in a row in another language before the call follows
+CHAT_SWITCH_MIN_WORDS = 3  # "yes", "ok", "haudu sir": too short to tell a language by
 _INDIAN_LETTERS = re.compile(r"[ऀ-෿]")  # Devanagari to Sinhala: every Indian script we hear
 
 
@@ -40,6 +45,7 @@ def spoken_form(code: str | None) -> str | None:
 class LanguageLock:
     language: str = "kn-IN"
     locked: bool = False
+    instant: bool = False  # a chat: follow a clear change of language at once, never ask
     _other: str | None = None
     _other_turns: int = 0
 
@@ -64,6 +70,9 @@ class LanguageLock:
             return self.language
         if not self.locked:
             self.language, self.locked = heard, True
+        elif self.instant:
+            if heard != self.language and len(text.split()) >= CHAT_SWITCH_MIN_WORDS:
+                self.language = heard
         elif heard != self.language:
             self._other_turns = self._other_turns + 1 if heard == self._other else 1
             self._other = heard
