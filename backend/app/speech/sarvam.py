@@ -48,8 +48,9 @@ def transcribe(audio: bytes, filename: str = "speech.webm", content_type: str = 
                  int((time.perf_counter() - t0) * 1000))
 
 
-def speak(text: str, language: str, sample_rate: int | None = None) -> tuple[bytes, int]:
-    """WAV audio of `text`, and how long Sarvam took (ms). Phone calls ask for 16000 Hz."""
+def speak(text: str, language: str, sample_rate: int | None = None, codec: str | None = None) -> tuple[bytes, int]:
+    """Audio of `text` (WAV unless another codec is asked for), and how long Sarvam took (ms).
+    Phone calls ask for 16000 Hz; chat apps ask for "mp3", which Telegram plays as a voice note."""
     s = get_settings()
     lang = language if language in TTS_LANGUAGES else "en-IN"
     t0 = time.perf_counter()
@@ -60,14 +61,19 @@ def speak(text: str, language: str, sample_rate: int | None = None) -> tuple[byt
             json={"text": text[:1500], "target_language_code": lang, "model": s.sarvam_tts_model,
                   "speaker": s.sarvam_tts_speaker, "pace": s.sarvam_tts_pace,
                   "temperature": s.sarvam_tts_temperature,
-                  **({"speech_sample_rate": sample_rate} if sample_rate else {})},
+                  **({"speech_sample_rate": sample_rate} if sample_rate else {}),
+                  **({"output_audio_codec": codec} if codec else {})},
             timeout=20,
         )
     except httpx.HTTPError as e:
         raise SpeechError(f"tts {type(e).__name__}") from e
     if r.status_code != 200:
         raise SpeechError(f"tts HTTP {r.status_code}")
-    return join_wavs([base64.b64decode(a) for a in r.json()["audios"]]), int((time.perf_counter() - t0) * 1000)
+    parts = [base64.b64decode(a) for a in r.json()["audios"]]
+    ms = int((time.perf_counter() - t0) * 1000)
+    if codec and codec != "wav":
+        return b"".join(parts), ms  # MP3 pieces play correctly simply laid end to end
+    return join_wavs(parts), ms
 
 
 def join_wavs(parts: list[bytes]) -> bytes:
