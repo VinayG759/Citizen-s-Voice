@@ -21,6 +21,7 @@ Submission is **Sun 18 Oct, 3:30 PM IST**.
 - `4455c6c` try-it rate limit keys on Railway's `X-Real-IP` (was DigitalOcean's header, so all judges shared one limit). Railway staff say their edge overwrites it; some users report oddities, so verify on the live site.
 - `7eaef73` fix-photo check waits 25 s for Google (`PHOTO_CHECK_GOOGLE_TIMEOUT_S`) before OpenRouter, not 60.
 - `634f553` **Sangam-style sidebar** merged (Live desk, Complaints with filters, Map, Offices, Emerging issues, Morning brief + CSV). Vinay approved it.
+- `f3b81db` map pins: Google-style teardrops coloured by urgency, report-count badge, selected pin bigger (replaces the circles). `39dc8de` responsive fixes for phones (CSS only: feed rows, 40px tap targets, filters two to a row). **Committed locally, NOT deployed:** Vinay said not to push until Tharun's report is in; ship them with the report's fixes. Not yet seen by Vinay on real map tiles.
 - `docs/deploy-readiness.md`: the Railway audit, with the full env-var table.
 - `docs/judge-questions.md` Q29 updated (Telegram text + Kannada voice really tested).
 - Test sheet for Tharun (private artifact, Vinay shares it): https://claude.ai/artifact/KavMUpcVckdEJDUErNGy1p — 26 checks, copyable report.
