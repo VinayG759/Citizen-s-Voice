@@ -30,6 +30,6 @@ export function describe(e: ClerkEvent): string {
   if (e.tool === "file_complaint")
     return r.ok ? `Filed as ${r.tracking_id}` : `Not filed yet: ${((r.fix as string[]) ?? []).join("; ")}`;
   if (e.tool === "get_complaint_status") return r.found ? `${r.tracking_id} is ${String(r.status).replace("_", " ")}` : "No such complaint";
-  if (e.tool === "raise_emergency") return "Officers alerted";
+  if (e.tool === "raise_emergency") return "Marked as an emergency — flagged on the dashboard once filed";
   return "Done";
 }

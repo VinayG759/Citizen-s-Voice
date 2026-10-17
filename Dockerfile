@@ -21,7 +21,7 @@ COPY --from=web /web/dist /app/web/dist
 RUN useradd --create-home appuser
 USER appuser
 
-# DigitalOcean App Platform sets PORT (8080 by default).
+# The host (Railway) sets PORT; 8080 if it does not.
 EXPOSE 8080
 # Apply any new database migrations, then start the server.
 # No --proxy-headers / --forwarded-allow-ips: trusting X-Forwarded-For from anyone

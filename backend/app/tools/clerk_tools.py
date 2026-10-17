@@ -37,7 +37,8 @@ class ToolState:
 SPECS = [
     ToolSpec(
         "find_place",
-        "Look up a real place or landmark in Bengaluru North (Yelahanka, Rajanukunte, Hebbal and around). "
+        "Look up a real place anywhere in Bengaluru: an area, landmark, bus stop, school, temple, road or "
+        "campus gate. "
         "Returns up to 3 candidates with ids. Use the place name the caller said, in English letters if you can.",
         {"type": "object", "properties": {
             "query": {"type": "string", "description": "the place or landmark, e.g. 'Presidency University'"},
@@ -91,7 +92,9 @@ SPECS = [
     ToolSpec(
         "raise_emergency",
         "Use at once if anyone may be in danger: open manhole, fallen live wire, gas smell, collapsing wall, "
-        "flooding with current. Alerts officers immediately. Then tell the caller to call 112 if life is at risk.",
+        "flooding with current. Marks this complaint as an emergency (urgency 5, flagged at the top of the "
+        "officers' dashboard once filed); it does not call 112 or anyone else. Then tell the caller to call 112 "
+        "if life is at risk.",
         {"type": "object", "properties": {
             "reason": {"type": "string", "description": "what the danger is, in English"},
         }, "required": ["reason"]},

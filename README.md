@@ -15,11 +15,15 @@ G2, voice-first AI). All code written from 14 October 2026.
 | Phase | What | State |
 |---|---|---|
 | 0 | Foundation: API, dashboard shell, database, health check | ✅ merged 16 Oct |
-| 2 | Gemma clerk + try-it page (speak or type in the browser) | ✅ built 16 Oct; 12/12 scripted conversations pass against the real Gemma; browser microphone not yet tried by a person |
-| 1 + 3 | Phone line: Vobiz audio stream → end-of-speech detection → Sarvam → Gemma clerk → Sarvam voice; "one moment" filler; silence nudge; hang-up after filing | ✅ built 16 Oct and tested with a simulated call (real Sarvam + real Gemma); **not yet tried on a real phone** — needs the live server URL |
-| 4 | Live dashboard: complaint list, OpenStreetMap pins by urgency, live call panel with Gemma's steps, complaint page with full conversation | ✅ built 16 Oct; tested with fakes + a real live-feed check; needs your eyes in a browser |
+| 2 | Gemma clerk + try-it page (speak or type in the browser) | ✅ built 16 Oct; 14 scripted conversations pass against the real Gemma |
+| 1 + 3 | Phone line: Vobiz audio stream → end-of-speech detection → Sarvam → Gemma clerk → Sarvam voice; "one moment" filler; silence nudge; hang-up after filing | ✅ built 16 Oct; real phone calls work (first one filed CV-1004 on 16 Oct) |
+| 4 | Live dashboard: complaint list, OpenStreetMap pins by urgency, live call panel with Gemma's steps, complaint page with full conversation | ✅ built 16 Oct |
 | 5 | Smarter clerk: "already reported nearby" → one tracking ID per problem, priority raised every 3rd report; "what happened to my complaint?" without the number (phone) | ✅ built 16 Oct; golden conversations pass |
-| 6–8 | Photo check + call-back, demo hardening | planned |
+| After filing | Offices and deadlines, overdue, "most urgent first" with its working (open emergencies always first), office scorecard, officer sign-in: start work, send to another office, reopen, mark fixed only with a photo | ✅ built 17 Oct; tested with fakes |
+| 6 | Gemma 4 31B checks the officer's fix photo (advice only); call-back after a fix: we ring the citizen and Gemma reads yes / no / unclear — a "no" reopens | ✅ built 17 Oct; tested with fakes |
+| — | Telegram and WhatsApp: citizens message the clerk by text, voice note, photo or location pin | ✅ built 17 Oct; tested with fakes |
+| — | Emerging issues (spikes and nearby clusters, with evidence) and Morning Brief | ✅ built 17 Oct; tested with fakes |
+| 8 | Demo hardening: `scripts/reset_demo.py` (dry run unless confirmed), `scripts/smoke_test.py`, [demo script](docs/demo-script.md), [judge Q&A](docs/judge-questions.md) | ✅ built 17 Oct |
 
 The full plan is in [docs/implementation-plan.md](docs/implementation-plan.md)
 ([plain-language version](docs/implementation-plan-simple.md)).
@@ -36,8 +40,9 @@ Caller ◄───────────── Sarvam (text → speech) ◄�
 is filed only when the place is known and the caller has confirmed the read-back.
 
 **What Gemma does:** runs the whole conversation in the caller's everyday language, decides when to
-look up a place (`find_place` over 10,201 OpenStreetMap places in Bengaluru North, Kannada names
-included), when to raise an emergency, when to check a complaint's status, and when to file. Every
+look up a place (`find_place` over 26,935 OpenStreetMap places across all of Bengaluru — 16,135 with
+Kannada names, everyday names like "Majestic", named campus gates, and 4,298 roads so a pin can sit on
+the road the caller names), when to raise an emergency, when to check a complaint's status, and when to file. Every
 decision is shown live as "Gemma's steps". If a reply slips into another script (Tamil, Telugu…),
 code catches it and asks again.
 
@@ -50,7 +55,7 @@ Hindi or English.
 - **Sarvam AI** — speech-to-text and text-to-speech for Indian languages
 - **Vobiz** — Indian phone number and call audio
 - **OpenStreetMap** — map and place data (© OpenStreetMap contributors, ODbL)
-- **Supabase** (Postgres), **FastAPI**, **React + Vite**, hosted on **DigitalOcean App Platform**
+- **Supabase** (Postgres), **FastAPI**, **React + Vite**, hosted on **Railway**
 
 ## Run it locally
 
@@ -77,16 +82,18 @@ Production: one container (see [Dockerfile](Dockerfile)) — FastAPI serves the 
 ## Tests
 
 ```bash
-cd backend && python -m pytest          # 65 tests: safety rules, places, tools, try-it, phone line, dashboard API, duplicates
-cd web && npm test                      # 9 tests
+cd backend && python -m pytest          # safety rules, places, tools, all channels, dashboard, officers, call-back, demo scripts
+cd web && npm test
 cd backend && python -m scripts.golden  # 14 scripted conversations against the REAL Gemma (no DB writes)
 ```
 
 ## Privacy
 
 All tables have row-level security enabled, so Supabase's public API cannot read them (done).
-Callers' phone numbers will be stored only as a keyed hash plus the last four digits, and the dashboard
-will never show a full number (built with the phone line, Phase 1–3).
+Callers' phone numbers are stored only as a keyed hash plus the last four digits; the dashboard never
+shows a full number. The way to reach a citizen for the call-back is stored encrypted, only if
+`CONTACT_ENCRYPTION_KEY` is set. Sensitive reports (harassment, violence, corruption) keep no caller
+identity and show no details publicly. Officers sign in with one shared passcode — enough for a pilot.
 
 ## Licence
 

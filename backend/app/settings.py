@@ -72,7 +72,7 @@ class Settings(BaseSettings):
     vobiz_auth_id: str = ""
     vobiz_auth_token: str = ""
     vobiz_phone_number: str = ""
-    # The app's public address, e.g. https://citizens-voice-xxxx.ondigitalocean.app — used to tell
+    # The app's public address, e.g. https://citizens-voice-production.up.railway.app — used to tell
     # Vobiz where to stream call audio. Empty: taken from the request's Host header.
     public_base_url: str = ""
 
