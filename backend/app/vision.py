@@ -18,13 +18,19 @@ log = logging.getLogger(__name__)
 
 MAX_IMAGE_BYTES = 5_000_000  # same cap as the upload; two of these stay well under Gemini's 20 MB request limit
 REASON_CHARS = 300
+LIST_ITEMS = 5  # matching / differences: a few short things a person can scan
+ITEM_CHARS = 80
+CONFIDENCE = ("low", "medium", "high")
 
 FIX_PROMPT = """You check repair work for a city complaints office. The complaint was:
 "{summary}" (category: {category}, place: {place}).
 The FIRST image is the officer's photo of the finished repair.{before}
 Does the photo show this problem fixed? Reply with JSON only:
 {{"looks_fixed": "yes" | "no" | "unclear", "reason": "<one short sentence an officer can read>",
-  "same_place_likely": true | false | null}}"""
+  "same_place_likely": true | false | null,
+  "matching": ["<things seen in both photos: a wall, a tree, a sign, road markings>"],
+  "differences": ["<what changed between the photos>"],
+  "confidence": "low" | "medium" | "high"}}"""
 
 PROBLEM_PROMPT = """A citizen sent this photo with a complaint to a city helpline in Bengaluru.
 What problem does it show? Reply with JSON only:
@@ -75,6 +81,14 @@ def _text(v) -> str:
     return " ".join(v.split())[:REASON_CHARS] if isinstance(v, str) else ""
 
 
+def _items(v) -> list[str]:
+    """At most LIST_ITEMS short, non-empty strings; anything else is dropped."""
+    if not isinstance(v, list):
+        return []
+    items = [" ".join(x.split())[:ITEM_CHARS] for x in v if isinstance(x, str)]
+    return [x for x in items if x][:LIST_ITEMS]
+
+
 def _unclear(reason: str, **extra) -> dict:
     return {"looks_fixed": "unclear", "reason": reason, "same_place_likely": None, **extra}
 
@@ -93,7 +107,7 @@ def check_fix(photo: tuple[str, bytes], complaint: dict, before: tuple[str, byte
     try:
         reply = router.generate(system="You judge photos carefully and honestly. Never guess beyond what is visible.",
                                 messages=[Msg("user", prompt, images=images)], tools=[], mode="background",
-                                caller_language="en-IN", max_tokens=300,
+                                caller_language="en-IN", max_tokens=500,
                                 primary_timeout_s=get_settings().photo_check_google_timeout_s)
     except LLMError as e:
         log.warning("photo check failed: %s", e)
@@ -103,11 +117,15 @@ def check_fix(photo: tuple[str, bytes], complaint: dict, before: tuple[str, byte
         log.warning("photo check: no JSON in Gemma's reply")
         return _unclear("Gemma's answer could not be read.", model=reply.model)
     looks = str(raw.get("looks_fixed", "")).strip().lower()
+    confidence = str(raw.get("confidence", "")).strip().lower()
     return {
         "looks_fixed": looks if looks in ("yes", "no", "unclear") else "unclear",
         "reason": _text(raw.get("reason")) or "Gemma gave no reason.",
         # Without the citizen's photo there is nothing to compare: Gemma cannot know, whatever it says.
         "same_place_likely": _bool(raw.get("same_place_likely")) if before else None,
+        "matching": _items(raw.get("matching")) if before else [],
+        "differences": _items(raw.get("differences")) if before else [],
+        "confidence": confidence if confidence in CONFIDENCE else None,
         "compared_with_citizen_photo": before is not None,
         "model": reply.model,
     }
