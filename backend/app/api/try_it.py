@@ -16,7 +16,12 @@ import uuid
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 
+import re
+
+from pydantic import BaseModel
+
 from app import events
+from app.contact import seal
 from app.clerk.clerk import Conversation
 from app.clerk.language import guess_language, written_in
 from app.phone.call import GREETING as GREETING_PARTS, greeting_text
@@ -157,6 +162,38 @@ def turn(
         "ended": result.ended,
         "timings": {"stt_ms": stt_ms, "llm_ms": result.llm_ms},
     }
+
+
+class CallbackNumber(BaseModel):
+    session_id: str
+    phone: str
+
+
+_INDIAN_MOBILE = re.compile(r"(?:\+?91|0)?([6-9]\d{9})")
+
+
+@router.post("/contact")
+def leave_number(body: CallbackNumber, request: Request) -> dict:
+    """After filing in the browser: an optional mobile number, so we can call back when it's fixed.
+    Stored encrypted like a phone caller's; only the last 4 digits are ever shown."""
+    with _lock:
+        entry = _sessions.get(body.session_id)
+    if entry is None:
+        raise HTTPException(404, "session expired")
+    conv = entry[0]
+    if conv.state.filed is None:
+        raise HTTPException(409, "file the complaint first")
+    if _rate_limited(_client_ip(request)):
+        raise HTTPException(429, "too many requests")
+    m = _INDIAN_MOBILE.fullmatch(re.sub(r"[\s-]", "", body.phone))
+    if not m:
+        raise HTTPException(422, "enter a 10-digit Indian mobile number")
+    sealed = seal("phone", f"+91{m.group(1)}")
+    if sealed is None:
+        raise HTTPException(503, "call-backs are not set up on this server")
+    if not conv.repo.set_contact(conv.state.filed.id, sealed, m.group(1)[-4:]):
+        raise HTTPException(409, "this report keeps no contact details")
+    return {"ok": True, "last4": m.group(1)[-4:]}
 
 
 @router.post("/speak")

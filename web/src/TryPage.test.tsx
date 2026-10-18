@@ -12,6 +12,7 @@ function mockServer(turn: unknown | number) {
       if (path === "/api/try/start")
         return new Response(JSON.stringify({ session_id: "s1", greeting: "ನಮಸ್ಕಾರ", greeting_audio: null }));
       if (path === "/api/try/speak") return new Response("", { status: 404 }); // jsdom can't play audio
+      if (path === "/api/try/contact") return new Response(JSON.stringify({ ok: true, last4: "2345" }));
       if (typeof turn === "number") return new Response("{}", { status: turn });
       return new Response(JSON.stringify(turn));
     }),
@@ -40,6 +41,21 @@ test("typing a complaint shows the clerk's reply, Gemma's steps and the filed co
   expect(screen.getByText("Looking up “Presidency University” near Rajanukunte")).toBeInTheDocument();
   expect(screen.getByText("Found: Presidency University")).toBeInTheDocument();
   expect(screen.getByText(/now appears on the/).closest("[role=status]")).toHaveTextContent("CV-1001");
+});
+
+test("after filing, a browser citizen can leave a number for the call-back", async () => {
+  mockServer({
+    caller_text: "x", language: "en-IN", reply: "Filed", events: [], complaint: { tracking_id: "CV-1001" },
+    ended: false, timings: { stt_ms: 0, llm_ms: 1 },
+  });
+  render(<TryPage />);
+  fireEvent.click(screen.getByRole("button", { name: "Start talking" }));
+  fireEvent.change(await screen.findByLabelText("Or type your message"), { target: { value: "x" } });
+  fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+  const phone = await screen.findByLabelText(/Want a call when it's fixed/);
+  fireEvent.change(phone, { target: { value: "98450 12345" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  expect(await screen.findByText("We'll call the number ending 2345 when it's marked fixed.")).toBeInTheDocument();
 });
 
 test("too many messages gives a plain-language message", async () => {

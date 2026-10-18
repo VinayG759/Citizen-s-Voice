@@ -104,3 +104,47 @@ def test_a_reply_can_be_voiced_at_most_twice():
     client.post("/api/try/turn", data={"session_id": sid, "text": "road alli potholes"})
     codes = [client.post("/api/try/speak", data={"session_id": sid}).status_code for _ in range(3)]
     assert codes == [200, 200, 429]
+
+
+# ---- a browser citizen leaves a number for the call-back (18 Oct: browser citizens could not be reached) ----
+
+class ContactRepo(FakeRepo):
+    saved: list = []
+
+    def set_contact(self, complaint_id, contact_enc, last4):
+        ContactRepo.saved.append((complaint_id, contact_enc, last4))
+        return True
+
+
+def filed_session(monkeypatch):
+    from cryptography.fernet import Fernet
+    from app.db.repo import FiledComplaint
+    from app.settings import get_settings
+    monkeypatch.setattr(get_settings(), "contact_encryption_key", Fernet.generate_key().decode())
+    monkeypatch.setattr(try_it, "Repo", ContactRepo)
+    ContactRepo.saved = []
+    sid = start()
+    try_it._sessions[sid][0].state.filed = FiledComplaint(41, 1041)
+    return sid
+
+
+def test_a_browser_citizen_can_leave_a_number_for_the_call_back(monkeypatch):
+    from app.contact import unseal
+    sid = filed_session(monkeypatch)
+    r = client.post("/api/try/contact", json={"session_id": sid, "phone": "98450 12345"})
+    assert r.status_code == 200 and r.json()["last4"] == "2345"
+    [(row, sealed, last4)] = ContactRepo.saved
+    assert row == 41 and last4 == "2345" and unseal(sealed) == ("phone", "+919845012345")
+
+
+@pytest.mark.parametrize("phone", ["12345", "98450 1234", "5845012345", "+1 415 555 0100", ""])
+def test_only_an_indian_mobile_number_is_accepted(monkeypatch, phone):
+    sid = filed_session(monkeypatch)
+    assert client.post("/api/try/contact", json={"session_id": sid, "phone": phone}).status_code == 422
+    assert ContactRepo.saved == []
+
+
+def test_no_number_before_the_complaint_is_filed(monkeypatch):
+    sid = filed_session(monkeypatch)
+    try_it._sessions[sid][0].state.filed = None
+    assert client.post("/api/try/contact", json={"session_id": sid, "phone": "9845012345"}).status_code == 409

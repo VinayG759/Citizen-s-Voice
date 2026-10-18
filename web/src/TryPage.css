@@ -88,6 +88,32 @@
   color: inherit;
 }
 
+/* Optional call-back number after filing */
+.callback {
+  margin-bottom: var(--space-4);
+}
+
+.callback__row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.callback__row .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.callback__hint,
+.callback__done {
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.callback__done {
+  margin-bottom: var(--space-4);
+}
+
 /* Controls */
 .controls {
   display: flex;

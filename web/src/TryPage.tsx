@@ -6,7 +6,7 @@ import { Button } from "./components/Button";
 import { Card } from "./components/Card";
 import { EmptyState } from "./components/EmptyState";
 import { Toaster } from "./components/Toaster";
-import { ApiError, postForm, userMessage } from "./lib/api";
+import { ApiError, postForm, postJson, userMessage } from "./lib/api";
 import { microphoneSupported, playBase64Wav, playClerkReply, startRecording, type Recording } from "./lib/recorder";
 import { describe, type ClerkEvent } from "./lib/steps";
 import { toast } from "./lib/toast";
@@ -28,6 +28,52 @@ type Line = { who: "caller" | "clerk"; text: string; language?: string; ms?: num
 type Phase = "not-started" | "starting" | "idle" | "recording" | "thinking" | "speaking" | "ended";
 
 const LANGUAGE_NAMES: Record<string, string> = { kn: "Kannada", hi: "Hindi", en: "English" };
+
+/** After filing: an optional number, so we can call when an officer marks it fixed and ask if it really is.
+ * Without it a browser citizen can't be reached (18 Oct). */
+function CallbackNumber({ sessionId }: { sessionId: string }) {
+  const [phone, setPhone] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState<string | null>(null);
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const r = await postJson<{ last4: string }>("/api/try/contact", { session_id: sessionId, phone });
+      setSaved(r.last4);
+    } catch (err) {
+      toast.error(err instanceof ApiError && err.status === 422 ? "Enter a 10-digit mobile number." : userMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (saved) return <p className="callback__done">We'll call the number ending {saved} when it's marked fixed.</p>;
+  return (
+    <form className="callback" onSubmit={save}>
+      <label className="field__label" htmlFor="callback-phone">
+        Want a call when it's fixed? Your mobile number (optional)
+      </label>
+      <div className="callback__row">
+        <input
+          id="callback-phone"
+          className="input"
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel"
+          placeholder="98450 12345"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+        />
+        <Button type="submit" loading={busy} disabled={!phone.trim() || busy}>
+          Save
+        </Button>
+      </div>
+      <p className="callback__hint">Stored encrypted. Only the last 4 digits are ever shown, and it's deleted once you confirm the fix.</p>
+    </form>
+  );
+}
 
 export function TryPage() {
   const [phase, setPhase] = useState<Phase>("not-started");
@@ -184,6 +230,7 @@ export function TryPage() {
                     </span>
                   </div>
                 )}
+                {complaint && sessionId && <CallbackNumber sessionId={sessionId} />}
 
                 {phase === "ended" ? (
                   <Button variant="primary" onClick={begin}>

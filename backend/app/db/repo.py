@@ -118,6 +118,15 @@ class Repo:
             # person's own words (tester's report, 17 Oct: a Telegram report showed the first caller's call).
             return FiledComplaint(report.id, parent.tracking_number), parent.report_count, raised
 
+    def set_contact(self, complaint_id: int, contact_enc: str, last4: str) -> bool:
+        """A browser citizen leaves a number for the call-back after filing. Never on a sensitive report."""
+        with Session(get_engine()) as s, s.begin():
+            c = s.get(Complaint, complaint_id)
+            if c is None or c.sensitive:
+                return False
+            c.contact_enc, c.caller_last4 = contact_enc, last4
+            return True
+
     def latest_for_caller(self, caller_hash: str) -> ComplaintStatus | None:
         """The caller's most recent complaint (the original, if theirs was a linked report)."""
         with Session(get_engine()) as s:
