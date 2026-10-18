@@ -157,7 +157,7 @@ Both are advice: Gemma never changes a status. C2 below makes all of it visible.
 
 ### E2 — Optional pincode (medium)
 - **Value:** callers who know their pincode get the right area, even when the area's name is shared ("Dasarahalli" is three places).
-- **Data, no new source:** our cached OpenStreetMap download holds `addr:postcode` on many places: **134 Bengaluru pincodes**, 111 with 5+ points. The median point of each is its centre (560057 → 13.049, 77.509, T. Dasarahalli; 560001 → MG Road; 560064 → Yelahanka). Built into `data/pincodes.json` by `build_places.py`.
+- **Data, no new source:** our cached OpenStreetMap download holds `addr:postcode` on many places: **134 Bengaluru pincodes**, 107 with 5+ distinct points (built 18 Oct). The median point of each is its centre (560057 → 13.049, 77.509, T. Dasarahalli; 560001 → MG Road; 560064 → Yelahanka). Built into `data/pincodes.json` by `build_places.py`.
 - **Simplest version:** `find_place` takes an optional `pincode`; its centre acts like the area's centre (places within 4 km come first, others are not read back). The clerk may ask **once**, and only when the place is unclear: "if you know the pincode, tell me; otherwise that's fine". Never required. A pincode we don't know is ignored.
 - **Misuse:** a wrong pincode pulls the search towards the wrong area; the read-back (which names the place) catches it.
 

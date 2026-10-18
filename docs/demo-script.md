@@ -73,7 +73,7 @@ Stay on the Live desk: everything for this moment is on one screen.
 ### 2:15–2:35 — The call-back: the citizen decides (~20 s)
 
 1. Within a few seconds of *Mark fixed*, **your phone rings** (the phone that made the call). Answer on speaker.
-2. It asks, in Kannada, whether the problem is really fixed. Say **"ಇಲ್ಲ, ಇನ್ನೂ ಕತ್ತಲು ಇದೆ"** (no, it's still dark).
+2. It asks, in the language of your call (Kannada if you called in Kannada), whether the problem is really fixed. Say **"ಇಲ್ಲ, ಇನ್ನೂ ಕತ್ತಲು ಇದೆ"** (no, it's still dark).
 3. Refresh the complaint page: the timeline shows the citizen's answer and the complaint is **reopened**, with higher priority.
 4. Say: "The officer said fixed. The citizen said no. The citizen wins."
 
