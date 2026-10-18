@@ -1,7 +1,9 @@
-"""Sarvam: the ears (speech → text) and the mouth (text → speech). Nothing else."""
+"""Sarvam: the ears (speech → text) and the mouth (text → speech), plus translating an officer's note
+into the citizen's language. It makes no decisions."""
 
 import base64
 import io
+import logging
 import time
 import wave
 from dataclasses import dataclass
@@ -10,8 +12,12 @@ import httpx
 
 from app.settings import get_settings
 
+log = logging.getLogger(__name__)
+
 STT_URL = "https://api.sarvam.ai/speech-to-text"
 TTS_URL = "https://api.sarvam.ai/text-to-speech"
+TRANSLATE_URL = "https://api.sarvam.ai/translate"
+TRANSLATE_TIMEOUT_S = 8  # a status update waits on it: better the original note than a late one
 
 # Languages Sarvam can speak. Anything else is spoken as Indian English.
 TTS_LANGUAGES = {"kn-IN", "hi-IN", "en-IN", "ta-IN", "te-IN", "ml-IN", "mr-IN", "bn-IN", "gu-IN", "pa-IN", "od-IN"}
@@ -74,6 +80,33 @@ def speak(text: str, language: str, sample_rate: int | None = None, codec: str |
     if codec and codec != "wav":
         return b"".join(parts), ms  # MP3 pieces play correctly simply laid end to end
     return join_wavs(parts), ms
+
+
+def translate(text: str, target_language: str) -> str | None:
+    """`text` in `target_language` ("kn-IN", "hi-IN", …), or None if Sarvam couldn't: the caller then
+    sends the original. Never raises."""
+    s = get_settings()
+    if not s.sarvam_api_key:
+        return None
+    try:
+        r = httpx.post(
+            TRANSLATE_URL,
+            headers={"api-subscription-key": s.sarvam_api_key},
+            json={"input": text[:1000], "source_language_code": "auto", "target_language_code": target_language,
+                  "model": s.sarvam_translate_model},
+            timeout=TRANSLATE_TIMEOUT_S,
+        )
+        if r.status_code != 200:
+            log.warning("translate HTTP %s", r.status_code)
+            return None
+        out = r.json().get("translated_text")
+    except Exception as e:  # timeout, bad JSON, a reply that isn't an object: all mean "no translation"
+        log.warning("translate failed: %s", type(e).__name__)
+        return None
+    if not isinstance(out, str) or not out.strip():
+        log.warning("translate: no translated_text in the reply")
+        return None
+    return out.strip()
 
 
 def join_wavs(parts: list[bytes]) -> bytes:
