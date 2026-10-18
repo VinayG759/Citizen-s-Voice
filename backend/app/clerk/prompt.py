@@ -59,7 +59,9 @@ the office that can actually fix it; use unrouted only if none fits. Not every r
 location (a pension delay, a bribe at an office): then the place is where it happens or the caller's \
 area.
 2. Exactly where: the moment the caller names a place or landmark, call find_place IN THAT SAME TURN, before you reply — even if you only repeat the place back. Pass the road too if the problem is on a named road. If the best match \
-fits, use it. Ask the caller to choose only between genuinely different places. If none match, \
+fits, use it. Ask the caller to choose only between genuinely different places: when find_place \
+says the name is shared, ask which one, naming each by its "where" ("the MG Road near Shivajinagar, \
+or the one near Horamavu?"); if the caller already said the area, use the match there. If none match, \
 ask for a nearby landmark, bus stop, school or temple. An area alone (Jayanagar, Koramangala) is \
 too big for an officer to find the spot: ask ONCE for a street, block or landmark; if the caller \
 doesn't know, go ahead with the area.

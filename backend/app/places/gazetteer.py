@@ -60,8 +60,16 @@ class Match:
         return d
 
 
+# Roads everyone calls by initials. OpenStreetMap spells central MG Road "Mahatma Gandhi Road", and a
+# village road far west "M G Road": expanding both makes them namesakes, and the central one wins a tie.
+# Only before "road": "KR Puram" is not "Krishna Rajendra Puram".
+_INITIALS = {"mg": "mahatma gandhi", "kg": "kempegowda", "jc": "jayachamarajendra", "kr": "krishna rajendra"}
+_INITIALS_ROAD = re.compile(r"\b(m ?g|k ?g|j ?c|k ?r)\s+(?=road\b|rd\b)")
+
+
 def normalise(text: str) -> str:
     text = text.lower().replace(",", " ").replace(".", " ")
+    text = _INITIALS_ROAD.sub(lambda m: _INITIALS[m.group(1).replace(" ", "")] + " ", text)
     text = _FILLER.sub(" ", text)
     return " ".join(text.split())
 
@@ -117,6 +125,7 @@ _KIND_RANK = {"suburb": 0, "town": 0, "neighbourhood": 1, "locality": 1, "quarte
 
 CITY_CENTRE = (12.9716, 77.5946)  # on a tie, the namesake nearer the middle of Bengaluru wins
 SAME_PLACE_KM = 2.0  # two results with one name closer than this are one place; farther apart, both are shown
+SAME_ROAD_KM = 4.0  # a long road is stored as several points: within this, one road is one option
 # Everyday and former names ("Yelahanka Bus Station") are looser than the official name: on a tie the
 # official name wins. Small enough that "Majestic" still finds Kempegowda Bus Station.
 ALT_NAME_PENALTY = 4
@@ -144,6 +153,10 @@ def _score(query: str, place: Place) -> float:
     q = normalise(query)
     if not q:
         return 0.0
+    # "OMG", "MIG": too short for a fuzzy match to mean anything. Only the same letters count.
+    if len(q.replace(" ", "")) <= 3:
+        names = (place.name_en, place.name_kn, *place.alt.split("|"))
+        return 100.0 if any(normalise(n).replace(" ", "") == q.replace(" ", "") for n in names if n) else 0.0
     best = 0.0
     names = [(place.name_en, False), (place.name_kn, False), *((a, True) for a in place.alt.split("|"))]
     for name, is_alt in names:
@@ -305,13 +318,37 @@ def find(query: str, area: str | None = None, limit: int = 3) -> list[Match]:
         if m.score < MIN_SCORE:
             continue
         # One name, one place — unless the namesakes are far apart (two different Koramangalas).
-        if any(o.place.label.lower() == m.place.label.lower() and
-               km_between(o.place.lat, o.place.lon, m.place.lat, m.place.lon) < SAME_PLACE_KM for o in out):
+        # A road is a long line: its points within SAME_ROAD_KM are one road.
+        if any(normalise(o.place.label) == normalise(m.place.label) and
+               km_between(o.place.lat, o.place.lon, m.place.lat, m.place.lon)
+               < (SAME_ROAD_KM if m.place.kind == "road" else SAME_PLACE_KM) for o in out):
             continue
         out.append(m)
         if len(out) == limit:
             break
     return out
+
+
+_AREA_KINDS = {"suburb", "neighbourhood", "quarter", "town", "locality"}
+
+
+@lru_cache
+def _areas() -> tuple[Place, ...]:
+    return tuple(p for p in load() if p.kind in _AREA_KINDS and p.name_en)
+
+
+WHERE_SUBURB_KM = 3.0  # a suburb this close names the spot better than a nearer, little-known neighbourhood
+
+
+def where(place: Place) -> str:
+    """The nearest suburb (or else neighbourhood), so a caller can tell namesakes apart:
+    "the MG Road near Shivajinagar, or the one near Horamavu?"."""
+    def km(a: Place) -> float:
+        return km_between(a.lat, a.lon, place.lat, place.lon)
+    areas = [a for a in _areas() if a.label != place.label]
+    suburbs = [a for a in areas if a.kind in ("suburb", "town") and km(a) <= WHERE_SUBURB_KM]
+    near = min(suburbs or areas, key=km, default=None)
+    return near.label if near else ""
 
 
 # ---- roads: put the pin ON the road the caller names --------------------------------------

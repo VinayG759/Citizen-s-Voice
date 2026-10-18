@@ -129,3 +129,50 @@ def test_new_town_bus_station_is_not_the_old_town_one():
 
 def test_an_everyday_name_still_works_despite_the_small_penalty():
     assert "Kempegowda" in g.find("Majestic")[0].place.label
+
+
+# ---- shared names and initials (found 18 Oct: "MG Road" pinned a village road at the city's western edge) ----
+
+CENTRAL_MG_ROAD = (12.9755, 77.6068)  # MG Road metro
+
+
+def test_mg_road_is_central_mg_road_first():
+    p = g.find("MG Road")[0].place
+    assert g.km_between(p.lat, p.lon, *CENTRAL_MG_ROAD) < 1.5
+
+
+@pytest.mark.parametrize("query", ["OMG", "MIG"])
+def test_a_short_query_never_fuzzy_matches_mg_road(query):
+    assert all("Gandhi" not in m.place.label and "M G" not in m.place.label for m in g.find(query, limit=8))
+
+
+def test_initials_expand_only_before_road():
+    assert g.normalise("M.G. Road") == g.normalise("Mahatma Gandhi Road") == "mahatma gandhi"
+    assert g.normalise("KR Puram") == "kr puram"
+
+
+def test_one_long_road_is_one_option():
+    labels = [m.place.label for m in g.find("Mahatma Gandhi Road", limit=8)
+              if m.place.kind == "road" and g.km_between(m.place.lat, m.place.lon, *CENTRAL_MG_ROAD) < 4]
+    assert len(labels) <= 1
+
+
+def test_shared_names_are_offered_by_where_they_are():
+    from app.tools import clerk_tools
+    out = clerk_tools.find_place(clerk_tools.ToolState(), "MG Road")
+    assert 2 <= len(out["matches"]) <= clerk_tools.OPTIONS
+    assert out["matches"][0]["where"] == "Shivajinagar"
+    assert len({m["where"] for m in out["matches"]}) == len(out["matches"])
+    assert "share this name" in out["note"] and "near Shivajinagar" in out["note"]
+
+
+def test_a_famous_suburb_is_not_questioned():
+    from app.tools import clerk_tools
+    out = clerk_tools.find_place(clerk_tools.ToolState(), "Koramangala")
+    assert "share this name" not in out["note"]
+
+
+def test_with_the_area_named_the_match_there_is_used():
+    from app.tools import clerk_tools
+    out = clerk_tools.find_place(clerk_tools.ToolState(), "MG Road", "Shivajinagar")
+    assert out["matches"][0]["where"] == "Shivajinagar" and "share this name" not in out["note"]

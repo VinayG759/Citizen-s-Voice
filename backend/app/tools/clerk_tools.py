@@ -44,7 +44,7 @@ SPECS = [
         "find_place",
         "Look up a real place anywhere in Bengaluru: an area, landmark, bus stop, school, temple, road or "
         "campus gate. "
-        "Returns up to 3 candidates with ids. Use the place name the caller said, in English letters if you can.",
+        "Returns up to 4 different places with ids, each with where it is (the nearest suburb). Use the place name the caller said, in English letters if you can.",
         {"type": "object", "properties": {
             "query": {"type": "string", "description": "the place or landmark, e.g. 'Presidency University'"},
             "area": {"type": "string", "description": "village or area if the caller said one, e.g. 'Rajanukunte'"},
@@ -107,12 +107,22 @@ SPECS = [
 ]
 
 
+OPTIONS = 4  # at most this many different places offered for one name
+OPTION_KM = 1.5  # matches closer than this are one place for a caller
+
+
 def find_place(state: ToolState, query: str, area: str | None = None, road: str | None = None) -> dict:
-    matches = gazetteer.find(query, area)
-    # "Presidency University Hostel" is part of "Presidency University": same place for a caller.
-    if matches:
-        top = matches[0].place.label.lower()
-        matches = [matches[0]] + [m for m in matches[1:] if not m.place.label.lower().startswith(top)]
+    # Matches close together ("Presidency University" and its hostel, MG Road metro and the Taj on MG Road)
+    # are one place for a caller; up to OPTIONS genuinely different places are offered.
+    matches: list[gazetteer.Match] = []
+    for m in gazetteer.find(query, area, limit=12):
+        # "Presidency University Hostel" is part of "Presidency University": same place for a caller.
+        if matches and m.place.label.lower().startswith(matches[0].place.label.lower() + " "):
+            continue
+        if all(gazetteer.km_between(o.place.lat, o.place.lon, m.place.lat, m.place.lon) > OPTION_KM for o in matches):
+            matches.append(m)
+        if len(matches) == OPTIONS:
+            break
     # "On Kakolu Road near Presidency University": the problem is on the road, so the pin goes on
     # the road at the point nearest the landmark — not in the middle of the campus.
     if matches and road:
@@ -130,7 +140,7 @@ def find_place(state: ToolState, query: str, area: str | None = None, road: str 
     out = []
     for m in matches:
         d = {"id": m.place.id, "name": m.place.label, "name_kn": m.place.name_kn,
-             "kind": m.place.kind, "confidence": round(m.score)}
+             "kind": m.place.kind, "where": gazetteer.where(m.place), "confidence": round(m.score)}
         if m.distance_km_from_area is not None:
             d["km_from_area"] = round(m.distance_km_from_area, 1)
         out.append(d)
@@ -142,6 +152,14 @@ def find_place(state: ToolState, query: str, area: str | None = None, road: str 
                         "away. Do not read these back. Ask for a nearby landmark, bus stop or road in "
                         f"{area}, then search again. If that fails too, file at {area} itself with their "
                         "landmark in words."}
+    shared = [d for d in out if gazetteer.normalise(d["name"]) == gazetteer.normalise(out[0]["name"])]
+    # A suburb is the famous one ("Koramangala"): no need to ask about a village of that name 40 km out.
+    if len(shared) > 1 and not area and matches[0].place.kind not in ("suburb", "town"):
+        where = ", ".join(f"near {d['where']}" for d in shared)
+        return {"matches": out,
+                "note": f"{len(shared)} different places share this name ({where}). Ask the caller which one, "
+                        "naming each by where it is, unless what they said already tells you. "
+                        "If the caller says it is not the place, never offer it again."}
     return {
         "matches": out,
         "note": "If the first match fits what the caller said, read it back for a yes/no, using its name "
