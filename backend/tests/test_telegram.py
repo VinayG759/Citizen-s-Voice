@@ -194,6 +194,25 @@ def test_a_photo_is_described_to_the_clerk_and_kept_with_the_complaint(monkeypat
     assert verdict["what_i_see"] == "A deep pothole on a tarred road"
 
 
+def test_an_image_sent_as_a_file_counts_as_a_photo(monkeypatch):
+    # CV-1013, 18 Oct: "water.webp" sent as a file from Telegram Desktop was dropped; only the caption arrived.
+    seen, told = [], []
+    monkeypatch.setattr(chat.vision, "look_at_problem",
+                        lambda photo, cats: seen.append(photo[0]) or {"is_civic_problem": True,
+                                                                      "what_i_see": "Water leaking from a pipe"})
+    monkeypatch.setattr(clerk_mod.router, "generate",
+                        lambda **k: told.append(k["messages"][-1].text) or LLMReply("Where?", [], "f", "f", 1))
+    post({"document": {"file_id": "d", "file_name": "water.webp", "mime_type": "image/webp", "file_size": 39000},
+          "caption": "water leakage in doddaballapura"})
+    assert seen == ["image/webp"]
+    assert "Water leaking from a pipe" in told[0] and "doddaballapura" in told[0]
+
+
+def test_a_file_that_is_not_an_image_is_not_treated_as_a_photo(monkeypatch):
+    monkeypatch.setattr(chat.vision, "look_at_problem", lambda *a: pytest.fail("not an image"))
+    post({"document": {"file_id": "d", "file_name": "bill.pdf", "mime_type": "application/pdf"}, "caption": "hello"})
+
+
 def test_a_photo_right_after_filing_goes_to_that_complaint(monkeypatch):
     saved = []
     monkeypatch.setattr(chat.vision, "look_at_problem", lambda photo, cats: {"what_i_see": "pothole"})

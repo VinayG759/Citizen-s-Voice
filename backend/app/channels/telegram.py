@@ -157,6 +157,10 @@ def _handle(message: dict, token: str) -> None:
                 # Telegram sends several sizes, smallest first: take the biggest that isn't huge.
                 fits = [p for p in photos if (p.get("file_size") or 0) <= MAX_FILE_BYTES] or photos[:1]
                 msg.photo = ("image/jpeg", api.download(fits[-1]["file_id"]))
+            elif (doc := message.get("document")) and str(doc.get("mime_type", "")).startswith("image/"):
+                # An image sent "as a file": Telegram Desktop always sends .webp this way. CV-1013, 18 Oct:
+                # it was silently dropped and only its caption kept.
+                msg.photo = (doc["mime_type"], api.download(doc["file_id"]))
         except TelegramError as e:
             log.warning("telegram download failed: %s", e)
             api.send_text(chat_id, COULD_NOT_FETCH)
