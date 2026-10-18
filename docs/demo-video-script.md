@@ -130,8 +130,10 @@ it"* (danger) or *"the water pipe burst, water is gushing out"* (resource loss).
 > minute, like a burst water main, that's an emergency too. Emergencies jump to the top, and every
 > officer's dashboard gets an alert straight away.
 
-> Record this scene only if the "danger / resource loss" alert is live when you record. If not,
-> show the existing emergency flag and say only the first two sentences.
+**ACTION:** keep the officer's Live desk open (signed in) while the emergency is filed: a red alert
+appears top right ("Emergency · resource loss" or "danger to life") with an **Open** button. Click
+**Enable emergency alerts** once beforehand to also get a system notification.
+If the alert doesn't appear when you record, show the red pin and the Live desk's emergency line instead.
 
 ## Scene 8: Morning brief and the public scorecard (4:20–4:40)
 

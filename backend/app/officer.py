@@ -83,6 +83,21 @@ def age_days(created_at: datetime, now: datetime | None = None) -> float:
     return (now - created_at).total_seconds() / 86400
 
 
+# Two kinds of emergency. Danger to life (live wire, gas leak, open manhole) comes first; a resource
+# wasted by the minute (a burst water main) comes next. Both come before any ordinary complaint.
+# The kind is worked out from the category, so it needs no stored field and covers older complaints too.
+LOSS_CATEGORIES = ("water",)
+EMERGENCY_SCORE = {"danger": 60, "loss": 45}
+EMERGENCY_WHY = {"danger": "emergency: danger to life", "loss": "emergency: resource loss"}
+
+
+def emergency_kind(c: dict) -> str | None:
+    """"danger", "loss", or None for an ordinary complaint."""
+    if not c.get("is_emergency"):
+        return None
+    return "loss" if c.get("category") in LOSS_CATEGORIES else "danger"
+
+
 def follow_up(c: dict, now: datetime | None = None) -> dict:
     """Deadline, overdue state and priority for one public complaint dict — with the working shown,
     so anyone can see WHY it is ranked where it is (the AI never decides the order)."""
@@ -92,9 +107,10 @@ def follow_up(c: dict, now: datetime | None = None) -> dict:
     closed = c["status"] == "fixed"
     overdue = (not closed) and age > days
     score, why = 0, []
-    if c.get("is_emergency"):
-        score += 50
-        why.append("emergency")
+    kind = emergency_kind(c)
+    if kind:
+        score += EMERGENCY_SCORE[kind]
+        why.append(EMERGENCY_WHY[kind])
     score += c.get("urgency", 3) * 5
     why.append(f"urgency {c.get('urgency', 3)}")
     if c.get("report_count", 1) > 1:
@@ -117,6 +133,7 @@ def follow_up(c: dict, now: datetime | None = None) -> dict:
         "escalated": overdue,  # an overdue complaint is shown to the office's senior officer
         "priority": score,
         "priority_why": " · ".join(why),
+        "emergency_kind": kind,
     }
 
 

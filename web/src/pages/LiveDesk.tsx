@@ -12,7 +12,10 @@ const NEWEST = 8; // the rest are on the Complaints page
 export function LiveDesk() {
   const { list, call, config, selected, select } = useShell();
   const items = list.state === "ok" ? list.items : [];
-  const emergencies = items.filter((c) => c.is_emergency && c.status !== "fixed").length;
+  const open = items.filter((c) => c.is_emergency && c.status !== "fixed");
+  const emergencies = open.length;
+  const danger = open.filter((c) => c.emergency_kind !== "loss").length;
+  const loss = emergencies - danger;
   const overdue = items.filter((c) => c.overdue).length;
 
   return (
@@ -25,7 +28,8 @@ export function LiveDesk() {
         <div className="desk__side">
           {emergencies > 0 && (
             <p className="dash__alert" role="alert">
-              {emergencies} open emergency{emergencies > 1 ? " reports" : " report"}
+              {emergencies} open emergency{emergencies > 1 ? " reports" : " report"}:{" "}
+              {[danger && `${danger} danger to life`, loss && `${loss} resource loss`].filter(Boolean).join(", ")}
             </p>
           )}
           {overdue > 0 && (

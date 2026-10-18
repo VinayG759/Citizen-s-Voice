@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Building2 } from "lucide-react";
+import { EmergencyAlerts, notifyBrowser, type EmergencyAlert } from "./components/EmergencyAlerts";
 import { EmptyState } from "./components/EmptyState";
 import { MobileBar, Sidebar, currentPage } from "./components/Sidebar";
 import { useOfficer } from "./components/OfficerSignIn";
@@ -44,6 +45,7 @@ export function Shell() {
   const [selected, setSelected] = useState<string | null>(null);
   const [fresh, setFresh] = useState<Set<string>>(new Set());
   const [call, setCall] = useState<LiveCall | null>(null);
+  const [alerts, setAlerts] = useState<EmergencyAlert[]>([]);
   const [version, setVersion] = useState(0);
   const isOfficer = useOfficer();
   const emerging = useResource<Emerging>("/api/emerging?headlines=true");
@@ -115,6 +117,16 @@ export function Shell() {
       if (filed) void addComplaint(filed.tracking_id);
     } else if (e.type === "complaint_updated") {
       void refreshComplaint(String(e.tracking_id));
+    } else if (e.type === "emergency" && isOfficer) {
+      const a: EmergencyAlert = {
+        tracking_id: String(e.tracking_id),
+        emergency_kind: e.emergency_kind === "loss" ? "loss" : "danger",
+        place: String(e.place ?? ""),
+        office: String(e.office ?? ""),
+        summary: typeof e.summary === "string" ? e.summary : null,
+      };
+      setAlerts((cur) => [a, ...cur.filter((x) => x.tracking_id !== a.tracking_id)]);
+      notifyBrowser(a);
     } else if (e.type === "call_ended") {
       setCall((cur) => (cur && cur.callId === Number(e.call_id) ? { ...cur, ended: String(e.outcome) } : cur));
     }
@@ -171,6 +183,9 @@ export function Shell() {
             </div>
           )}
         </main>
+        {isOfficer && (
+          <EmergencyAlerts alerts={alerts} onDismiss={(id) => setAlerts((cur) => cur.filter((x) => x.tracking_id !== id))} />
+        )}
         <Toaster />
       </div>
     </ShellContext.Provider>

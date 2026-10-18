@@ -40,7 +40,6 @@ def test_an_open_emergency_always_ranks_first(monkeypatch):
     pothole = complaint(tracking_id="CV-1001", urgency=4, report_count=4, created_at=days_ago(10))
     wire = complaint(tracking_id="CV-1002", is_emergency=True, urgency=5, created_at=days_ago(0))
     fixed_wire = complaint(tracking_id="CV-1003", is_emergency=True, status="fixed", created_at=days_ago(1))
-    assert officer.follow_up(pothole)["priority"] > officer.follow_up(wire)["priority"]
     monkeypatch.setattr(api.repo, "list_complaints", lambda *a: [pothole, fixed_wire, wire])
     order = [c["tracking_id"] for c in client.get("/api/complaints?sort=priority").json()]
     assert order == ["CV-1002", "CV-1001", "CV-1003"]

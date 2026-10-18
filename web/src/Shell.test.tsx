@@ -106,3 +106,33 @@ test("the Offices page counts each office's open and overdue complaints", async 
   expect(screen.getByText("deadline 2 days")).toBeInTheDocument();
   expect(screen.getByText("1.5 d")).toBeInTheDocument();
 });
+
+test("an officer gets a red alert for a new emergency that stays until dismissed", async () => {
+  sessionStorage.setItem("cv-officer-token", "test-token");
+  vi.stubGlobal("EventSource", FakeEventSource);
+  mockFetch({ "/health": healthy, "/api/config": config, [NEWEST]: [] });
+  renderAt("/");
+  expect(await screen.findByText("Waiting for a call")).toBeInTheDocument();
+  act(() => {
+    FakeEventSource.last.push({
+      type: "emergency", tracking_id: "CV-1050", emergency_kind: "loss", place: "Jakkur Lake",
+      office: "BWSSB (water)", summary: "Burst water main",
+    });
+  });
+  expect(await screen.findByText("Emergency · resource loss")).toBeInTheDocument();
+  expect(screen.getByText(/Burst water main at Jakkur Lake/)).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Open" })).toHaveAttribute("href", "/c/CV-1050");
+  fireEvent.click(screen.getByRole("button", { name: "Dismiss alert for CV-1050" }));
+  expect(screen.queryByText("Emergency · resource loss")).not.toBeInTheDocument();
+});
+
+test("the public dashboard shows no emergency alert", async () => {
+  vi.stubGlobal("EventSource", FakeEventSource);
+  mockFetch({ "/health": healthy, "/api/config": config, [NEWEST]: [] });
+  renderAt("/");
+  expect(await screen.findByText("Waiting for a call")).toBeInTheDocument();
+  act(() => {
+    FakeEventSource.last.push({ type: "emergency", tracking_id: "CV-1051", emergency_kind: "danger", place: "X", office: "Y" });
+  });
+  expect(screen.queryByText("Emergency · danger to life")).not.toBeInTheDocument();
+});

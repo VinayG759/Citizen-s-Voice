@@ -11,7 +11,7 @@ Rules enforced here, not trusted to the model:
 import re
 from dataclasses import dataclass, field
 
-from app import officer
+from app import events, officer
 from app.db.models import CATEGORIES, DEFAULT_DEPARTMENT, DEPARTMENTS
 from app.llm.types import ToolSpec
 from app.places import gazetteer
@@ -99,8 +99,9 @@ SPECS = [
     ),
     ToolSpec(
         "raise_emergency",
-        "Use at once if anyone may be in danger: open manhole, fallen live wire, gas smell, collapsing wall, "
-        "flooding with current. Marks this complaint as an emergency (urgency 5, flagged at the top of the "
+        "Use at once if anyone may be in danger (open manhole, fallen live wire, gas leak, collapsing wall, "
+        "flooding with current) or a resource is being wasted by the minute (burst water main, pipe gushing "
+        "water). Marks this complaint as an emergency (urgency 5, flagged at the top of the "
         "officers' dashboard once filed); it does not call 112 or anyone else. Then tell the caller to call 112 "
         "if life is at risk.",
         {"type": "object", "properties": {
@@ -251,6 +252,12 @@ def file_complaint(state: ToolState, repo, session_info: dict, **a) -> dict:
                 "priority_raised": raised, "place": p.label}
     filed = repo.file_complaint(**forget, **fields)
     state.filed = filed
+    if fields["is_emergency"]:
+        # Every open officer dashboard raises an alert straight away (web/src/Shell.tsx).
+        events.publish("emergency", tracking_id=filed.tracking_id, emergency_kind=officer.emergency_kind(fields),
+                       place=p.label,
+                       office=officer.OFFICE_NAMES.get(department, department),
+                       summary=None if sensitive else fields["summary_en"][:200])
     return {"ok": True, "tracking_id": filed.tracking_id, "say_tracking_id_as": spoken_id(filed.tracking_number),
             "place": p.label, "sent_to": department}
 

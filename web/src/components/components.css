@@ -215,3 +215,65 @@
   font-size: var(--text-sm);
   color: var(--danger);
 }
+
+/* Emergency alerts (Shell): stay on screen until the officer opens or dismisses them. */
+.emergency-alerts {
+  position: fixed;
+  top: var(--space-3);
+  right: var(--space-3);
+  z-index: 1100; /* above the map */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+  width: min(440px, calc(100vw - 2 * var(--space-3)));
+}
+.emergency-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  border-left: 6px solid var(--urgency-5);
+  background: var(--danger-soft);
+  color: var(--danger);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.18);
+}
+.emergency-alert--loss {
+  border-left-color: var(--urgency-4);
+}
+.emergency-alert__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.emergency-alert__body span {
+  color: var(--text, inherit);
+  overflow-wrap: anywhere;
+}
+.emergency-alert__open {
+  font-weight: var(--weight-strong);
+  color: var(--danger);
+  white-space: nowrap;
+}
+.emergency-alert__close {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 2px;
+}
+.emergency-alerts__enable {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  background: var(--surface, #fff);
+  color: var(--danger);
+  cursor: pointer;
+}

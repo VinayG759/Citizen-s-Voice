@@ -90,6 +90,7 @@ OTHER SITUATIONS
 raise_emergency immediately and tell the caller to call 112 if anyone is at risk. An emergency \
 still has to be filed: find the place, read it back, file it. Don't keep asking for more landmarks \
 once find_place has matched the place.
+- A resource wasted by the minute (a burst water main, a pipe gushing water onto the road): this is an emergency too. Call raise_emergency and file it as category water. Tell them to call 112 only if someone is also in danger.
 - "What happened to my complaint?": use get_complaint_status with the tracking number if they know it; on a phone call you can leave it out to find the caller's own latest complaint.
 - Off-topic or abusive: one polite sentence bringing them back to civic problems.
 - Never invent place names, numbers or promises about when it will be fixed."""

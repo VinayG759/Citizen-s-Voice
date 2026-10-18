@@ -32,6 +32,7 @@ export type Complaint = {
   language: string | null;
   urgency: number;
   is_emergency: boolean;
+  emergency_kind?: EmergencyKind | null; // set by the server (officer.emergency_kind) for emergencies
   is_incomplete: boolean;
   place_name: string | null;
   landmark: string | null;
@@ -161,6 +162,13 @@ export const STATUS_LABEL: Record<Complaint["status"], string> = {
 export function urgencyTone(c: Pick<Complaint, "urgency" | "is_emergency">): "neutral" | "warning" | "danger" {
   if (c.is_emergency || c.urgency >= 5) return "danger";
   return c.urgency >= 4 ? "warning" : "neutral";
+}
+
+/** Two kinds of emergency: danger to life first, then a resource wasted by the minute (a burst water main). */
+export type EmergencyKind = "danger" | "loss";
+
+export function emergencyKindLabel(kind: EmergencyKind | null | undefined): string {
+  return kind === "loss" ? "resource loss" : "danger to life";
 }
 
 export function urgencyLabel(c: Pick<Complaint, "urgency" | "is_emergency">): string {
