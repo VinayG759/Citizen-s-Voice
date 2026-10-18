@@ -73,6 +73,32 @@ def test_same_place_is_only_judged_against_the_citizens_photo(monkeypatch):
     assert len(calls[0]["messages"][0].images) == 2 and "SECOND image" in calls[0]["messages"][0].text
 
 
+def test_what_matches_and_differs_is_kept_short(monkeypatch):
+    fake_gemma(monkeypatch, '{"looks_fixed": "yes", "reason": "r", "same_place_likely": true, '
+                            '"matching": ["  the same   blue wall ", "", 7, "a tree", "a sign", "road markings", '
+                            '"a lamp post", "a gate"], "differences": ["' + "x" * 200 + '"], "confidence": " HIGH "}')
+    v = vision.check_fix(("image/jpeg", JPEG), COMPLAINT, before=("image/png", PNG))
+    assert v["matching"] == ["the same blue wall", "a tree", "a sign", "road markings", "a lamp post"]
+    assert v["differences"] == ["x" * vision.ITEM_CHARS] and v["confidence"] == "high"
+
+
+def test_odd_or_missing_comparison_fields_are_cleaned(monkeypatch):
+    fake_gemma(monkeypatch, '{"looks_fixed": "no", "reason": "r", "matching": "a wall", "confidence": "certain"}')
+    v = vision.check_fix(("image/jpeg", JPEG), COMPLAINT, before=("image/png", PNG))
+    assert v["matching"] == [] and v["differences"] == [] and v["confidence"] is None
+    fake_gemma(monkeypatch, '{"looks_fixed": "no", "reason": "r"}')
+    v = vision.check_fix(("image/jpeg", JPEG), COMPLAINT, before=("image/png", PNG))
+    assert v["matching"] == [] and v["differences"] == [] and v["confidence"] is None
+
+
+def test_without_a_citizen_photo_nothing_is_said_to_match(monkeypatch):
+    # Nothing to compare with: whatever Gemma lists, it cannot have seen it in both photos.
+    fake_gemma(monkeypatch, '{"looks_fixed": "yes", "reason": "r", "matching": ["a wall"], '
+                            '"differences": ["new asphalt"], "confidence": "medium"}')
+    v = vision.check_fix(("image/jpeg", JPEG), COMPLAINT)
+    assert v["matching"] == [] and v["differences"] == [] and v["confidence"] == "medium"
+
+
 def test_provider_failure_is_graceful(monkeypatch):
     fake_gemma(monkeypatch, error=LLMError("gemini ReadTimeout; openrouter HTTP 502"))
     v = vision.check_fix(("image/jpeg", JPEG), COMPLAINT)

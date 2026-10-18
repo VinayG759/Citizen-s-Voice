@@ -54,10 +54,27 @@ export type Complaint = {
 };
 
 export type TimelineEntry = { status: Complaint["status"]; by: "officer" | "citizen" | "system"; note: string | null; at: string };
+/** What Gemma said about a photo (vision.py). Every field is optional: verdicts saved before
+ * 18 Oct have no matching / differences / confidence. */
+export type PhotoVerdict = {
+  // fix photo (check_fix)
+  looks_fixed?: "yes" | "no" | "unclear";
+  reason?: string;
+  same_place_likely?: boolean | null;
+  matching?: string[];
+  differences?: string[];
+  confidence?: "low" | "medium" | "high" | null;
+  compared_with_citizen_photo?: boolean;
+  // citizen photo (look_at_problem)
+  what_i_see?: string;
+  severity?: number | null;
+  model?: string;
+};
+
 export type PhotoMeta = {
   id: number;
   kind: "citizen" | "fix";
-  verdict: { looks_fixed?: "yes" | "no" | "unclear"; reason?: string; what_i_see?: string } | null;
+  verdict: PhotoVerdict | null;
   at: string;
 };
 

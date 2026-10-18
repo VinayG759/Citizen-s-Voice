@@ -47,7 +47,9 @@ test("anyone can see where a complaint is: office, deadline, timeline and Gemma'
   expect(screen.getByText("Overdue · escalated")).toBeInTheDocument();
   expect(screen.getByText(/7 days from filing — overdue/)).toBeInTheDocument();
   expect(screen.getByText("Crew sent")).toBeInTheDocument();
-  expect(screen.getByText("Gemma: not fixed")).toBeInTheDocument();
+  expect(screen.getByText("Photo check")).toBeInTheDocument();
+  expect(screen.getByText("not fixed")).toBeInTheDocument();
+  expect(screen.getByText("The pothole is still visible")).toBeInTheDocument();
   expect(screen.getByText(/^Telegram/)).toBeInTheDocument();
   expect(screen.queryByText("Officer actions")).not.toBeInTheDocument();
 });
@@ -68,6 +70,41 @@ test("a second person's report shows their own details and words, not only the f
   expect(screen.getByText("10 years")).toBeInTheDocument();
   expect(screen.getByText(/Telegram · English/)).toBeInTheDocument();
   expect(screen.getByText("pothole near St. Mary's school, ten years")).toBeInTheDocument();
+});
+
+test("the photo check shows both photos side by side and Gemma's comparison", async () => {
+  const photos = [
+    { id: 3, kind: "citizen", at: "2026-10-10T10:00:00+00:00",
+      verdict: { is_civic_problem: true, what_i_see: "A deep pothole beside a blue wall", severity: 4 } },
+    { id: 9, kind: "fix", at: "2026-10-12T10:00:00+00:00",
+      verdict: { looks_fixed: "yes", reason: "Fresh asphalt where the pothole was", same_place_likely: true,
+                 matching: ["blue wall", "neem tree"], differences: ["pothole filled"], confidence: "high",
+                 compared_with_citizen_photo: true, model: "gemma-4-31b-it" } },
+  ];
+  mockFetch({ "/api/complaints/CV-1004": { ...DETAIL, status: "fixed", photos } });
+  render(<ComplaintPage trackingId="CV-1004" />);
+  expect(await screen.findByText("Photo check")).toBeInTheDocument();
+  expect(screen.getByAltText("Photo sent by the citizen")).toHaveAttribute("src", "/api/complaints/CV-1004/photos/3");
+  expect(screen.getByAltText("Photo sent by the officer after the fix")).toHaveAttribute("src", "/api/complaints/CV-1004/photos/9");
+  expect(screen.getByText("Gemma saw: A deep pothole beside a blue wall")).toBeInTheDocument();
+  expect(screen.getByText("Severity 4 of 5")).toBeInTheDocument();
+  expect(screen.getByText("looks fixed")).toBeInTheDocument();
+  expect(screen.getByText("Yes")).toBeInTheDocument();
+  expect(screen.getByText("blue wall · neem tree")).toBeInTheDocument();
+  expect(screen.getByText("pothole filled")).toBeInTheDocument();
+  expect(screen.getByText("high")).toBeInTheDocument();
+  expect(screen.getByText("gemma-4-31b-it")).toBeInTheDocument();
+  expect(screen.getByText("Gemma's check is advice. The citizen's answer decides.")).toBeInTheDocument();
+  expect(screen.queryByText("No fix photo · the citizen's answer decides")).not.toBeInTheDocument();
+});
+
+test("without a citizen photo the check says there was nothing to compare", async () => {
+  // An old verdict (before 18 Oct): no matching, differences, confidence or compared flag.
+  mockFetch({ "/api/complaints/CV-1004": DETAIL });
+  render(<ComplaintPage trackingId="CV-1004" />);
+  expect(await screen.findByText("No citizen photo to compare")).toBeInTheDocument();
+  expect(screen.queryByText("What matches")).not.toBeInTheDocument();
+  expect(screen.queryByText("Confidence")).not.toBeInTheDocument();
 });
 
 test("a sensitive report hides the conversation from the public", async () => {

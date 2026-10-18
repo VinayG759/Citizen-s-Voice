@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { ArrowLeft, Camera, Play, RefreshCw, RotateCcw, SearchX, Send } from "lucide-react";
 import { AppHeader } from "./components/AppHeader";
 import { Badge } from "./components/Badge";
@@ -211,15 +211,7 @@ function Detail({ c, officer, onChanged }: { c: ComplaintDetail; officer: boolea
           </ol>
         </Card>
 
-        {c.photos.length > 0 && (
-          <Card title="Photos">
-            <div className="photos">
-              {c.photos.map((p) => (
-                <Photo key={p.id} trackingId={c.tracking_id} p={p} />
-              ))}
-            </div>
-          </Card>
-        )}
+        {c.photos.length > 0 && <PhotoCheck trackingId={c.tracking_id} photos={c.photos} />}
 
         {officer && <OfficerActions c={c} onChanged={onChanged} />}
 
@@ -256,9 +248,88 @@ function Detail({ c, officer, onChanged }: { c: ComplaintDetail; officer: boolea
   );
 }
 
-function Photo({ trackingId, p }: { trackingId: string; p: PhotoMeta }) {
-  const v = p.verdict;
+const LOOKS = { yes: "looks fixed", no: "not fixed", unclear: "can't tell" } as const;
+
+/** The citizen's photo and the fix photo side by side, with Gemma's comparison of the two.
+ * Gemma's check is advice: the citizen's call-back answer decides (vision.py). */
+function PhotoCheck({ trackingId, photos }: { trackingId: string; photos: PhotoMeta[] }) {
+  // The same pair Gemma compared: the citizen's first photo (repo.citizen_photo) and the latest fix.
+  const citizen = photos.find((p) => p.kind === "citizen");
+  const fix = [...photos].reverse().find((p) => p.kind === "fix");
+  const others = photos.filter((p) => p !== citizen && p !== fix);
+  const seen = citizen?.verdict;
+  const v = fix?.verdict;
   const tone = v?.looks_fixed === "yes" ? "success" : v?.looks_fixed === "no" ? "danger" : "neutral";
+  const compared = !!citizen && v?.compared_with_citizen_photo !== false;
+  const samePlace = !compared
+    ? "No citizen photo to compare"
+    : v?.same_place_likely === true ? "Yes" : v?.same_place_likely === false ? "No" : "Can't tell";
+  return (
+    <Card title={fix ? "Photo check" : "Photos"}>
+      <div className="photos">
+        {citizen && (
+          <Photo trackingId={trackingId} p={citizen}>
+            {seen?.what_i_see && <span>Gemma saw: {seen.what_i_see}</span>}
+            {seen?.severity && <span>Severity {seen.severity} of 5</span>}
+          </Photo>
+        )}
+        {fix && <Photo trackingId={trackingId} p={fix} />}
+        {others.map((p) => (
+          <Photo key={p.id} trackingId={trackingId} p={p} />
+        ))}
+      </div>
+      {fix && (
+        <>
+          {v?.looks_fixed ? (
+            <dl className="facts">
+              <dt>Gemma's verdict</dt>
+              <dd>
+                <Badge tone={tone}>{LOOKS[v.looks_fixed]}</Badge>
+              </dd>
+              <dt>Same place</dt>
+              <dd>{samePlace}</dd>
+              {compared && !!v.matching?.length && (
+                <>
+                  <dt>What matches</dt>
+                  <dd>{v.matching.join(" · ")}</dd>
+                </>
+              )}
+              {compared && !!v.differences?.length && (
+                <>
+                  <dt>What differs</dt>
+                  <dd>{v.differences.join(" · ")}</dd>
+                </>
+              )}
+              {v.confidence && (
+                <>
+                  <dt>Confidence</dt>
+                  <dd>{v.confidence}</dd>
+                </>
+              )}
+              {v.reason && (
+                <>
+                  <dt>Why</dt>
+                  <dd>{v.reason}</dd>
+                </>
+              )}
+              {v.model && (
+                <>
+                  <dt>Model</dt>
+                  <dd>{v.model}</dd>
+                </>
+              )}
+            </dl>
+          ) : (
+            <p className="live__none">Gemma did not check this photo.</p>
+          )}
+          <p className="actions__hint">Gemma's check is advice. The citizen's answer decides.</p>
+        </>
+      )}
+    </Card>
+  );
+}
+
+function Photo({ trackingId, p, children }: { trackingId: string; p: PhotoMeta; children?: ReactNode }) {
   return (
     <figure className="photo">
       <img
@@ -268,12 +339,7 @@ function Photo({ trackingId, p }: { trackingId: string; p: PhotoMeta }) {
       />
       <figcaption>
         {p.kind === "fix" ? "After the fix (officer)" : "From the citizen"}
-        {v?.looks_fixed && (
-          <span className="photo__verdict">
-            <Badge tone={tone}>Gemma: {v.looks_fixed === "yes" ? "looks fixed" : v.looks_fixed === "no" ? "not fixed" : "can't tell"}</Badge>
-            {v.reason && <span>{v.reason}</span>}
-          </span>
-        )}
+        {children && <span className="photo__verdict">{children}</span>}
       </figcaption>
     </figure>
   );
