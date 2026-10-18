@@ -17,6 +17,7 @@ import {
 } from "./ShellContext";
 import { Brief as BriefPage } from "./pages/Brief";
 import { Complaints } from "./pages/Complaints";
+import { Emergencies } from "./pages/Emergencies";
 import { Emerging as EmergingPage } from "./pages/Emerging";
 import { LiveDesk } from "./pages/LiveDesk";
 import { MapPage } from "./pages/MapPage";
@@ -25,6 +26,7 @@ import { Offices } from "./pages/Offices";
 const PAGES: Record<string, () => React.JSX.Element> = {
   "/": LiveDesk,
   "/complaints": Complaints,
+  "/emergencies": Emergencies,
   "/map": MapPage,
   "/offices": Offices,
   "/emerging": EmergingPage,

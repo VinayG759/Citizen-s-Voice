@@ -468,3 +468,14 @@
     transform: translateX(0);
   }
 }
+
+/* Emergencies page */
+.emergencies {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.emergencies__hint {
+  margin: 0 0 var(--space-3);
+  color: var(--text-muted);
+}

@@ -176,7 +176,7 @@ test("each number on the brief opens the complaints behind it", async () => {
   renderAt("/brief");
   const fixed = await screen.findByRole("link", { name: "2 Fixed: show these complaints" });
   expect(fixed).toHaveAttribute("href", "/complaints?status=fixed");
-  expect(screen.getByRole("link", { name: "1 Emergencies: show these complaints" })).toHaveAttribute("href", "/complaints?sort=priority");
+  expect(screen.getByRole("link", { name: "1 Emergencies: show these complaints" })).toHaveAttribute("href", "/emergencies");
   expect(screen.getByRole("link", { name: /open water complaints near Jayanagar/ })).toHaveAttribute("href", "/complaints?category=water");
   fireEvent.click(fixed);
   expect(window.location.pathname + window.location.search).toBe("/complaints?status=fixed");
@@ -220,4 +220,27 @@ test("a complaint filed while sorted by urgency appears, where the server ranks 
   expect(fetched(fetchMock, PRIORITY)).toBe(2); // asked again because the list changed
   const order = screen.getAllByRole("button", { name: /CV-/ }).map((b) => b.textContent);
   expect(order[0]).toContain("Live wire down");
+});
+
+
+test("the Emergencies page lists open emergencies only, danger to life before resource loss", async () => {
+  const wire = { ...CV1004, tracking_id: "CV-1060", category: "electricity", summary_en: "Live wire on the road",
+    is_emergency: true, emergency_kind: "danger", priority: 90 };
+  const pipe = { ...CV1004, tracking_id: "CV-1061", category: "water", summary_en: "Burst water main",
+    is_emergency: true, emergency_kind: "loss", priority: 75 };
+  const fixed = { ...wire, tracking_id: "CV-1062", summary_en: "Fixed wire", status: "fixed" };
+  mockFetch({ "/health": healthy, "/api/config": config, [NEWEST]: [pipe, CV1004, fixed, wire] });
+  renderAt("/emergencies");
+  expect(await screen.findByText("Danger to life (1)")).toBeInTheDocument();
+  expect(screen.getByText("Resource loss (1)")).toBeInTheDocument();
+  expect(screen.getByText("Live wire on the road")).toBeInTheDocument();
+  expect(screen.getByText("Burst water main")).toBeInTheDocument();
+  expect(screen.queryByText("Potholes in front of St. Mary's School")).not.toBeInTheDocument();
+  expect(screen.queryByText("Fixed wire")).not.toBeInTheDocument();
+});
+
+test("the Emergencies page says so when there are none", async () => {
+  mockFetch({ "/health": healthy, "/api/config": config, [NEWEST]: [CV1004] });
+  renderAt("/emergencies");
+  expect(await screen.findByText("No open emergencies")).toBeInTheDocument();
 });

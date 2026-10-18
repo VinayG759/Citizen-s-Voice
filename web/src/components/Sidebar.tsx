@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ClipboardList, Building2, Map as MapIcon, Menu, Mic, Newspaper, Radio, TrendingUp, X, type LucideIcon } from "lucide-react";
+import { ClipboardList, Building2, Map as MapIcon, Menu, Mic, Newspaper, Radio, Siren, TrendingUp, X, type LucideIcon } from "lucide-react";
 import { OfficerSignIn } from "./OfficerSignIn";
 import { SystemStatus } from "./SystemStatus";
 import { TrackBox } from "./TrackBox";
@@ -12,6 +12,7 @@ export const NAV: { group: string; items: { to: string; label: string; icon: Luc
     items: [
       { to: "/", label: "Live desk", icon: Radio },
       { to: "/complaints", label: "Complaints", icon: ClipboardList },
+      { to: "/emergencies", label: "Emergencies", icon: Siren },
       { to: "/map", label: "Map", icon: MapIcon },
     ],
   },

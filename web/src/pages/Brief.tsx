@@ -78,7 +78,7 @@ function BriefBody({ data }: { data: BriefData }) {
   // ranks emergencies, then overdue complaints, at the top (officer.rank_key).
   const tiles: [string, number, string][] = [
     [`New (${f.window_hours} h)`, f.new, "/complaints"],
-    ["Emergencies", f.new_emergencies, "/complaints?sort=priority"],
+    ["Emergencies", f.new_emergencies, "/emergencies"],
     ["Fixed", f.fixed, "/complaints?status=fixed"],
     ["Open now", f.open, "/complaints?status=open"],
     ["Past deadline", f.overdue, "/complaints?sort=priority"],
