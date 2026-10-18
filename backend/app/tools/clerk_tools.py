@@ -50,6 +50,8 @@ SPECS = [
             "area": {"type": "string", "description": "village or area if the caller said one, e.g. 'Rajanukunte'"},
             "road": {"type": "string", "description": "the road the problem is ON, if the caller named one, "
                                                      "e.g. 'Kakolu Road' — the pin is then placed on that road"},
+            "pincode": {"type": "string", "description": "6-digit pincode, only if the caller said one; "
+                                                        "places in it come first"},
         }, "required": ["query"]},
     ),
     ToolSpec(
@@ -112,11 +114,14 @@ OPTIONS = 4  # at most this many different places offered for one name
 OPTION_KM = 1.5  # matches closer than this are one place for a caller
 
 
-def find_place(state: ToolState, query: str, area: str | None = None, road: str | None = None) -> dict:
+def find_place(state: ToolState, query: str, area: str | None = None, road: str | None = None,
+               pincode: str | None = None) -> dict:
     # Matches close together ("Presidency University" and its hostel, MG Road metro and the Taj on MG Road)
     # are one place for a caller; up to OPTIONS genuinely different places are offered.
     matches: list[gazetteer.Match] = []
-    for m in gazetteer.find(query, area, limit=12):
+    pin = gazetteer.pincode_centre(pincode)
+    where_asked = area or (f"pincode {pin.name_en}" if pin else None)
+    for m in gazetteer.find(query, area, limit=12, pincode=pincode):
         # "Presidency University Hostel" is part of "Presidency University": same place for a caller.
         if matches and m.place.label.lower().startswith(matches[0].place.label.lower() + " "):
             continue
@@ -145,17 +150,17 @@ def find_place(state: ToolState, query: str, area: str | None = None, road: str 
         if m.distance_km_from_area is not None:
             d["km_from_area"] = round(m.distance_km_from_area, 1)
         out.append(d)
-    if area and matches[0].distance_km_from_area is not None and matches[0].distance_km_from_area > gazetteer.NEAR_KM:
+    if where_asked and matches[0].distance_km_from_area is not None and matches[0].distance_km_from_area > gazetteer.NEAR_KM:
         # Tester's report, 17 Oct: the caller's own words were read back ("St. Mary's School, Dasarahalli")
         # and confirmed, while the pin sat 15 km away. Never read back a place outside the caller's area.
         return {"matches": out,
-                "note": f"None of these is in {area}: the nearest is {round(matches[0].distance_km_from_area)} km "
-                        "away. Do not read these back. Ask for a nearby landmark, bus stop or road in "
-                        f"{area}, then search again. If that fails too, file at {area} itself with their "
-                        "landmark in words."}
+                "note": f"None of these is in {where_asked}: the nearest is {round(matches[0].distance_km_from_area)} "
+                        "km away. Do not read these back. Ask for a nearby landmark, bus stop or road in "
+                        f"{where_asked}, then search again."
+                        + (f" If that fails too, file at {area} itself with their landmark in words." if area else "")}
     shared = [d for d in out if gazetteer.normalise(d["name"]) == gazetteer.normalise(out[0]["name"])]
     # A suburb is the famous one ("Koramangala"): no need to ask about a village of that name 40 km out.
-    if len(shared) > 1 and not area and matches[0].place.kind not in ("suburb", "town"):
+    if len(shared) > 1 and not where_asked and matches[0].place.kind not in ("suburb", "town"):
         where = ", ".join(f"near {d['where']}" for d in shared)
         return {"matches": out,
                 "note": f"{len(shared)} different places share this name ({where}). Ask the caller which one, "

@@ -3,12 +3,14 @@
 Writes two files used at run time — the ONLY source of map positions for complaints:
   data/gazetteer.csv.gz  named places, landmarks, gates, and one point per ~1 km of each named road
   data/roads.json.gz     the shapes of named roads, so a pin can sit ON the road a caller names
+  data/pincodes.json     a centre point per Bengaluru pincode (the median of everything tagged with it)
 
 Gates: OpenStreetMap marks most campus/hospital gates as unnamed points. Each gate on or next to a
 named outline (college, school, hospital, park…) becomes "<that place> gate"; the gate closest to a
 main road is the main one.
 
 Run:  python -m scripts.build_places        (a few minutes; public Overpass servers are slow)
+      python -m scripts.build_places --pincodes   (only data/pincodes.json, from the cached tiles)
 Data © OpenStreetMap contributors, ODbL 1.0.
 """
 
@@ -189,6 +191,29 @@ def simplify(pts: list[tuple[float, float]], min_m: float = 15) -> list[tuple[fl
     return [(round(a, 6), round(b, 6)) for a, b in out]
 
 
+PINCODE_MIN_POINTS = 5  # fewer tagged points than this and the centre is a guess
+
+
+def build_pincodes() -> None:
+    """Pincode -> centre, from the addr:postcode tags in the cached tiles: no new download."""
+    points: dict[str, dict[str, tuple[float, float]]] = defaultdict(dict)
+    for tile in sorted(CACHE.glob("*.json.gz")):
+        with gzip.open(tile, "rt", encoding="utf-8") as f:
+            for el in json.load(f):
+                code = "".join((el.get("tags", {}).get("addr:postcode") or "").split())
+                lat = el.get("lat") or el.get("center", {}).get("lat")
+                lon = el.get("lon") or el.get("center", {}).get("lon")
+                if len(code) == 6 and code.startswith("56") and code.isdigit() and lat is not None:
+                    points[code][f"{el['type']}{el['id']}"] = (lat, lon)  # a tile can repeat an element
+    centres = {}
+    for code, pts in sorted(points.items()):
+        if len(pts) >= PINCODE_MIN_POINTS:
+            lats, lons = sorted(p[0] for p in pts.values()), sorted(p[1] for p in pts.values())
+            centres[code] = [round(lats[len(lats) // 2], 5), round(lons[len(lons) // 2], 5)]
+    (DATA / "pincodes.json").write_text(json.dumps(centres, indent=0), encoding="utf-8")
+    print(f"wrote {len(centres)} pincodes", file=sys.stderr)
+
+
 def main() -> None:
     elements: dict[str, dict] = {}
     dlat, dlon = (NORTH - SOUTH) / TILES, (EAST - WEST) / TILES
@@ -282,7 +307,8 @@ def main() -> None:
     with gzip.open(DATA / "roads.json.gz", "wt", encoding="utf-8") as f:
         json.dump(road_list, f, ensure_ascii=False, separators=(",", ":"))
     print(f"wrote {len(places)} places ({gate_rows} gates) and {len(road_list)} named roads", file=sys.stderr)
+    build_pincodes()
 
 
 if __name__ == "__main__":
-    main()
+    build_pincodes() if "--pincodes" in sys.argv else main()

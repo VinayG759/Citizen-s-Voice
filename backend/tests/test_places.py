@@ -176,3 +176,28 @@ def test_with_the_area_named_the_match_there_is_used():
     from app.tools import clerk_tools
     out = clerk_tools.find_place(clerk_tools.ToolState(), "MG Road", "Shivajinagar")
     assert out["matches"][0]["where"] == "Shivajinagar" and "share this name" not in out["note"]
+
+
+# ---- optional pincode (plan E2): one more "where", never required ----
+
+def test_a_pincode_picks_the_right_namesake():
+    from app.tools import clerk_tools
+    out = clerk_tools.find_place(clerk_tools.ToolState(), "Dasarahalli", pincode="560057")
+    assert out["matches"][0]["km_from_area"] < 2 and "share this name" not in out["note"]
+    m = g.find("Dasarahalli", pincode="560057")[0].place
+    assert g.km_between(m.lat, m.lon, *T_DASARAHALLI) < 2
+
+
+def test_a_pincode_works_like_an_area():
+    m = g.find("St. Mary's School", pincode="560057")[0].place
+    assert m.kind == "school" and g.km_between(m.lat, m.lon, *T_DASARAHALLI) < 2
+
+
+@pytest.mark.parametrize("pincode", ["999999", "", None, "abc"])
+def test_an_unknown_pincode_is_ignored(pincode):
+    assert [m.place.id for m in g.find("MG Road", pincode=pincode)] == [m.place.id for m in g.find("MG Road")]
+
+
+def test_pincode_centres_are_real():
+    c = g.pincode_centre("560 001")  # spaces as a caller might say it
+    assert c and g.km_between(c.lat, c.lon, *CENTRAL_MG_ROAD) < 1.5

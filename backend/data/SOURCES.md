@@ -19,4 +19,6 @@
   main road is the main gate (up to 3 per place).
 - roads.json.gz: 4,298 named roads with their shapes (points every ≥15 m), used to put
   a pin ON the road a caller names.
-- Rebuild: `python -m scripts.build_places` (finished tiles are cached in backend/.cache/).
+- pincodes.json: 107 Bengaluru pincodes, each the median point of everything OpenStreetMap
+  tags with that `addr:postcode` (5+ points). An optional "where" when a caller knows it.
+- Rebuild: `python -m scripts.build_places` (`--pincodes` for pincodes.json only; finished tiles are cached in backend/.cache/).

@@ -17,6 +17,7 @@ from pathlib import Path
 from rapidfuzz import fuzz, process
 
 GAZETTEER = Path(__file__).resolve().parents[2] / "data" / "gazetteer.csv.gz"
+PINCODES = Path(__file__).resolve().parents[2] / "data" / "pincodes.json"
 
 # Within this distance of the "area" the caller named, a match gets a boost.
 NEAR_KM = 4.0
@@ -258,8 +259,22 @@ def area_centres(area: str) -> list[Place]:
     return [p for p, s in hits if s >= best - 0.5]
 
 
-def find(query: str, area: str | None = None, limit: int = 3) -> list[Match]:
-    """Best matches for `query`; if `area` is given, places in that area come first."""
+@lru_cache
+def _pincodes() -> dict[str, tuple[float, float]]:
+    return {k: tuple(v) for k, v in json.loads(PINCODES.read_text(encoding="utf-8")).items()} if PINCODES.exists() else {}
+
+
+def pincode_centre(pincode: str | None) -> Place | None:
+    """The middle of a Bengaluru pincode, from data/pincodes.json. One we don't know is None."""
+    code = "".join((pincode or "").split())
+    if code not in _pincodes():
+        return None
+    lat, lon = _pincodes()[code]
+    return Place(f"pin-{code}", code, "", "pincode", lat, lon, "")
+
+
+def find(query: str, area: str | None = None, limit: int = 3, pincode: str | None = None) -> list[Match]:
+    """Best matches for `query`; if `area` (or a known `pincode`) is given, places in it come first."""
     places = load()
     centres: list[Place] = []
     # Gemma sometimes passes the place itself as the area ("Dasahalli" near "Dasahalli"):
@@ -268,6 +283,11 @@ def find(query: str, area: str | None = None, limit: int = 3) -> list[Match]:
         area = None
     if area:
         centres = area_centres(area)
+    # A pincode is one more "where": a shared area name ("Dasarahalli" is three places) plus the
+    # caller's pincode pulls the search to the right one.
+    pin = pincode_centre(pincode)
+    if pin:
+        centres = [c for c in centres if km_between(c.lat, c.lon, pin.lat, pin.lon) <= NEAR_KM] or [pin]
 
     def km_from_area(p: Place) -> float | None:
         return min(km_between(c.lat, c.lon, p.lat, p.lon) for c in centres) if centres else None

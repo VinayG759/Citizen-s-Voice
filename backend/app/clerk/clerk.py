@@ -205,7 +205,8 @@ class Conversation:
         t0 = time.perf_counter()
         try:
             if name == "find_place":
-                out = tools.find_place(self.state, str(args.get("query", "")), args.get("area"), args.get("road"))
+                out = tools.find_place(self.state, str(args.get("query", "")), args.get("area"), args.get("road"),
+                                       args.get("pincode"))
             elif name == "file_complaint":
                 info = {"language": self.language, "caller_hash": self.caller_hash,
                         "caller_last4": self.caller_last4, "channel": self.channel, "contact_enc": self.contact_enc,
