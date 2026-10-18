@@ -28,7 +28,9 @@ WhatsApp is out of scope for today (built, tested with fakes, not connected).
 | B3 | Browser: optional mobile number for the call-back | ✅ deployed 18 Oct, **Tharun testing** |
 | B4 | Telegram message on every status change | ✅ deployed 18 Oct, **Tharun testing** |
 | B5 | Caller asking "what happened?" hears the full status | ✅ deployed 18 Oct, **Tharun testing** |
-| C1 | Note box says it is public | to do (tiny) |
+| B6 | Officer's fix photo is optional | ✅ done (`fde781c`), not yet pushed |
+| B7 | Google Maps links give the exact spot (Telegram, browser) | ✅ done (`3d5ae3d`), not yet pushed |
+| C1 | Note box says it is public | ✅ done (`fde781c`), not yet pushed |
 | C2 | Photo comparison, in full, on the complaint page | to do (medium) |
 | C3 | Gemma's steps in detail | to do (small) |
 | C4 | "Calling the citizen…" shown live on the complaint page | to do (small), only if the call-back test passes |
@@ -82,13 +84,31 @@ WhatsApp is out of scope for today (built, tested with fakes, not connected).
 - **Simplest version:** `get_complaint_status` adds the office, the deadline, overdue or not, and the last three officer/citizen updates with notes. Gemma's photo verdict is left out of the notes.
 - **Replaces:** the bare "the officer is working on it".
 
+### B6 — The officer's fix photo is optional (`fde781c`)
+- **Value:** officers whose fix can't be photographed (a pension paid, a bus route restored).
+- **Simplest version:** `POST /complaints/{id}/fixed` takes the photo as optional. Without one, nothing goes to Gemma, the timeline says "marked fixed without a photo", and the page shows a public badge "No fix photo · the citizen's answer decides".
+- **Replaces:** the hard rule "Mark fixed needs a photo".
+- **Misuse:** officers could stop adding photos; the public badge makes that visible. The citizen's call-back answer is then the only check.
+
+### B7 — Google Maps links give the exact spot (`3d5ae3d`)
+- **Value:** Telegram and browser citizens: a link is more precise than any landmark, and covers places missing from OpenStreetMap.
+- **Simplest version:** `app/places/maps_link.py` reads the coordinates from the link (`!3d…!4d…`, `?q=lat,lon`, `@lat,lon`). Short links (`maps.app.goo.gl/…`) are opened one hop at a time until the coordinates appear. The spot then works exactly like a location pin (`chat.pin_note`): Bengaluru only, filed there without asking where. The welcome message and the clerk's "ask for a pin" rule mention links.
+- **Misuse:** only Google addresses are ever opened (`maps.app.goo.gl`, `goo.gl`, `*.google.com`, `*.google.co.in`); any other hop stops it, so a link can't make our server visit another website or an internal address. Unreadable link → the clerk asks for a landmark.
+- **Not yet tested with a real short link:** Tharun to share one from the Google Maps app.
+
+### C1 — The note box says it is public (`fde781c`)
+- One hint line under the note box: "Shown on the public timeline and sent to the citizen."
+
 ---
 
 ## 4. To do today, in order (code freeze 1 PM)
 
-### C1 — The note box says it is public (tiny)
-- **Value:** officers, who don't know the note is public and is now sent to the citizen.
-- **Simplest version:** one hint line under the note box in `OfficerActions` (`ComplaintPage.tsx`): "Shown in the public timeline and sent to the citizen."
+### Image analysis by Gemma — what it does today, and what C2 adds
+Gemma 4 31B looks at photos in two places:
+1. **A citizen's photo (Telegram):** `vision.look_at_problem` describes it ("a deep pothole on a tarred road"), guesses the category and severity (1–5), and flags danger to life. The clerk is told, so it doesn't ask what the photo already shows. Saved with the photo; **not shown anywhere yet**.
+2. **The officer's fix photo:** `vision.check_fix` compares it with the complaint, and with the citizen's photo when there is one: looks fixed / not fixed / can't tell, same place likely, and a reason. **Only a small badge is shown.**
+
+Both are advice: Gemma never changes a status. C2 below makes all of it visible.
 
 ### C2 — Photo comparison, in full (medium)
 - **Value:** officers and judges see *why* Gemma thinks it's fixed; the most visible use of Gemma's vision.

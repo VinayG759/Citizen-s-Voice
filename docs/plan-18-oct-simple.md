@@ -36,20 +36,38 @@ testing breaks, then rehearse.
 
 ---
 
+**Added late this morning (done, waiting for the next push):**
+
+| What you asked for | What we changed |
+|---|---|
+| Not every fix can be photographed | The officer's photo is **optional**. Without one, the page says publicly "No fix photo: the citizen's answer decides" |
+| Precise location in chats and the browser | Citizens can paste a **Google Maps link**; the pin goes exactly where it points. Our server only ever opens Google addresses |
+| The officer doesn't know the note is public | The note box now says "Shown on the public timeline and sent to the citizen" |
+
+---
+
+## How Gemma looks at photos
+
+- **When a citizen sends a photo:** Gemma describes what it sees ("a deep pothole"), how serious it is (1 to 5), and whether anyone is in danger. The clerk uses that, so it doesn't ask what the photo already shows.
+- **When the officer marks it fixed with a photo:** Gemma compares it with the complaint, and with the citizen's photo if there is one: does it look fixed, is it the same place, and why.
+- Gemma's view is always **advice**. It never changes a complaint by itself.
+- Today the dashboard shows only a small badge. The next task shows all of it.
+
+---
+
 ## Still to do today (before 1 PM)
 
-1. **The officer's note box says it's public.** The note goes into the public timeline and to the citizen, so the officer should know that.
-2. **Show the photo check properly.** The citizen's photo and the officer's "fixed" photo **side by side**, with what Gemma noticed:
+1. **Show the photo check properly.** The citizen's photo and the officer's "fixed" photo **side by side**, with what Gemma noticed:
    - is it the same place?
    - what matches in both photos (a wall, a tree, a shop sign)?
    - what's different?
    - how sure is it?
 
    Gemma's opinion is **advice**: the citizen's "yes" or "no" on the call-back is what counts.
-3. **Show Gemma's thinking in more detail.** For example: "checked for the same problem nearby: found CV-1004, 40 m away"; "sent to BBMP, 7-day deadline". Each step can be opened to see exactly what went in and came out.
-4. **Show the call-back as it happens** ("Calling the citizen…", then their answer), but only if Tharun's test shows the call-back really rings.
-5. *If time is left:* check the hidden GPS location and time stored in the officer's photo, to confirm it was taken at the right place after the complaint.
-6. **Update the judge answers and the demo script.** The demo gets a new moment: the officer marks it fixed, your phone rings on stage, you say "no, it's still dark", and it reopens.
+2. **Show Gemma's thinking in more detail.** For example: "checked for the same problem nearby: found CV-1004, 40 m away"; "sent to BBMP, 7-day deadline". Each step can be opened to see exactly what went in and came out.
+3. **Show the call-back as it happens** ("Calling the citizen…", then their answer), but only if Tharun's test shows the call-back really rings.
+4. *If time is left:* check the hidden GPS location and time stored in the officer's photo, to confirm it was taken at the right place after the complaint.
+5. **Update the judge answers and the demo script.** The demo gets a new moment: the officer marks it fixed, your phone rings on stage, you say "no, it's still dark", and it reopens.
 
 ---
 
