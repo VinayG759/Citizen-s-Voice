@@ -301,3 +301,23 @@ def test_a_place_name_inside_kannada_is_not_english():
 def test_each_reply_is_voiced_in_the_language_it_is_written_in(text, expected):
     from app.clerk.language import written_in
     assert written_in(text, "kn-IN") == expected
+
+
+def test_a_caller_asking_about_their_complaint_hears_the_office_deadline_and_latest_update():
+    # 18 Oct: phone citizens are called only after the fix, so calling in must give the whole picture.
+    class Repo:
+        def complaint_status(self, n):
+            return ComplaintStatus("CV-1013", "in_progress", "water", "Water leakage", "Kongadiyappa College",
+                                   datetime(2026, 10, 1, tzinfo=__import__("datetime").timezone.utc), "bwssb", False, [
+                                       {"status": "open", "by": "system", "note": "filed", "at": "2026-10-01T04:13:00"},
+                                       {"status": "in_progress", "by": "officer", "note": "Crew sent",
+                                        "at": "2026-10-02T05:00:00"}])
+    out = clerk_tools.get_complaint_status(Repo(), "CV-1013")
+    assert out["office"] == "BWSSB (water)" and out["deadline_days"] == 2 and out["overdue"] is True
+    assert out["updates"] == ["2026-10-02: the officer is working on it (Crew sent)"]
+
+
+def test_gemmas_photo_verdict_is_not_read_out_as_the_officers_note():
+    line = clerk_tools._update_line({"status": "fixed", "by": "officer", "note": "Patched · Gemma: yes — fresh asphalt",
+                                     "at": "2026-10-18T03:33:00"}, {"fixed": "marked as fixed"})
+    assert line == "2026-10-18: marked as fixed (Patched)"

@@ -2,7 +2,7 @@
 
 import logging
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 from sqlalchemy import desc, select
@@ -32,6 +32,10 @@ class ComplaintStatus:
     summary_en: str
     place_name: str | None
     created_at: datetime
+    # For "what happened to my complaint?": the office, and what officers (and the citizen) did so far.
+    department: str = "unrouted"
+    is_emergency: bool = False
+    updates: list[dict] = field(default_factory=list)  # timeline entries: status, by, note, at
 
 
 class Repo:
@@ -136,14 +140,19 @@ class Repo:
                 return None
             if c.duplicate_of:
                 c = s.get(Complaint, c.duplicate_of)
-            return ComplaintStatus(c.tracking_id, c.status, c.category, c.summary_en, c.place_name, c.created_at)
+            return _status(s, c)
 
     def complaint_status(self, tracking_number: int) -> ComplaintStatus | None:
         with Session(get_engine()) as s:
             c = s.scalar(select(Complaint).where(Complaint.tracking_number == tracking_number))
             if not c:
                 return None
-            return ComplaintStatus(c.tracking_id, c.status, c.category, c.summary_en, c.place_name, c.created_at)
+            return _status(s, c)
+
+
+def _status(s: Session, c: Complaint) -> ComplaintStatus:
+    return ComplaintStatus(c.tracking_id, c.status, c.category, c.summary_en, c.place_name, c.created_at,
+                           c.department, c.is_emergency, timeline(s, c.id))
 
 
 def _forget_caller(s: Session, call_id: int | None) -> None:

@@ -11,6 +11,7 @@ Rules enforced here, not trusted to the model:
 import re
 from dataclasses import dataclass, field
 
+from app import officer
 from app.db.models import CATEGORIES, DEFAULT_DEPARTMENT, DEPARTMENTS
 from app.llm.types import ToolSpec
 from app.places import gazetteer
@@ -265,9 +266,27 @@ def get_complaint_status(repo, tracking_id: str | None, caller_hash: str | None 
         return {"found": False, "note": "Ask for the tracking number, e.g. C V 1 0 4 2."}
     plain = {"open": "registered, waiting for the officer", "in_progress": "the officer is working on it",
              "fixed": "marked as fixed", "reopened": "reopened after the citizen said it was not fixed"}
+    # The complete picture for a citizen who calls in (18 Oct: phone citizens are called only after the fix,
+    # so calling in is how they follow it): which office, the deadline, overdue or not, and what was done.
+    due = officer.follow_up({"created_at": st.created_at.isoformat(), "department": st.department,
+                             "is_emergency": st.is_emergency, "status": st.status})
+    done = [_update_line(u, plain) for u in st.updates if u["by"] in ("officer", "citizen")][-3:]
     return {"found": True, "tracking_id": st.tracking_id, "status": plain.get(st.status, st.status),
             "say_tracking_id_as": spoken_id(int(st.tracking_id.split("-")[1])), "category": st.category,
-            "summary": st.summary_en, "place": st.place_name, "filed_on": st.created_at.date().isoformat()}
+            "summary": st.summary_en, "place": st.place_name, "filed_on": st.created_at.date().isoformat(),
+            "office": due["office"], "deadline_days": due["deadline_days"], "overdue": due["overdue"],
+            "updates": done or ["no action yet"],
+            "note": "Tell them the status, the office and whether it is overdue, then the latest update "
+                    "(with the officer's note if there is one), in two short sentences."}
+
+
+def _update_line(u: dict, plain: dict) -> str:
+    """'2026-10-18: the officer is working on it (Crew sent, work starts Monday)'. Gemma's own photo
+    verdict, added to the officer's note when marked fixed, is advice and is left out."""
+    note = " · ".join(p for p in (u.get("note") or "").split(" · ") if p and not p.startswith("Gemma:"))
+    if u["by"] == "citizen" and note:  # "citizen confirmed it is fixed …" says it all
+        return f"{u['at'][:10]}: {note}"
+    return f"{u['at'][:10]}: {plain.get(u['status'], u['status'])}" + (f" ({note})" if note else "")
 
 
 def raise_emergency(state: ToolState, reason: str) -> dict:
