@@ -79,10 +79,23 @@ hear Urdu but not speak it.
 **11. How accurate is it with places and accents?**
 Measured honestly: 14 scripted test conversations against the real Gemma all pass, and a handful of
 real phone calls worked (the first real call filed complaint CV-1004 in 5 turns). We have **not**
-measured accuracy over a large set of real callers. Places come from 26,935 OpenStreetMap entries
-covering all of Bengaluru: 16,135 have Kannada names, 16,253 have everyday names like "Majestic", and
-there are 2,350 named campus gates and 4,298 roads (so a pin can sit on the road the caller names).
-Matching tolerates misspellings, and the read-back catches mistakes. **Weakness found and fixed 17 Oct:** a bare name shared by several places ("Koramangala", "Indiranagar") used to pick the wrong one. Now the suburb beats a same-named village, ties go to the one nearer central Bengaluru, and far-apart namesakes are both offered so the caller can choose. Covered by tests. Not yet re-measured on real calls.
+measured accuracy over a large set of real callers. Places come from 65,755 OpenStreetMap entries
+covering all of Bengaluru: areas, schools, hospitals, temples, bus stops, and the landmarks people
+actually give directions by (shops, banks, ATMs, restaurants, pharmacies, petrol pumps, apartments).
+20,841 have Kannada names, 21,916 have everyday names like "Majestic", and there are 2,350 named campus
+gates and 4,298 roads (so a pin can sit on the road the caller names).
+Matching tolerates misspellings, and the read-back catches mistakes. **Weakness found and fixed 17 Oct:** a bare name shared by several places ("Koramangala", "Indiranagar") used to pick the wrong one. Now the suburb beats a same-named village, ties go to the one nearer central Bengaluru, and far-apart namesakes are both offered so the caller can choose. Covered by tests.
+**Found by our tester on 17 Oct, fixed and re-tested on the live site:** "St. Mary's School, Dasarahalli"
+pinned a St. Mary's 15 km away. Now a place inside the area the caller names beats the same name
+elsewhere (Bengaluru has three Dasarahallis; all count), and a place outside that area is never read back.
+
+**11a. What if the place isn't on your map at all?**
+It happens: our tester's school, St. Mary's Convent in T. Dasarahalli, is not on OpenStreetMap under
+any name. Gemma never guesses a look-alike. If the caller says "no" to a place, it is never offered
+again. In a Telegram chat, Gemma asks for a **location pin**, which gives the exact spot. On a phone
+call, it files at the area (T. Dasarahalli) with the landmark in the caller's own words ("in front of
+St. Mary's Convent, Jain Temple Road"), so the officer still finds it. Tested on the live site 17 Oct.
+A paid place search (Google Places) would fill the gaps; **not built**, it needs a billing decision.
 
 ## Speed and cost
 
@@ -216,8 +229,10 @@ Built and tested: the phone line (a few real calls), the browser page, the Gemma
 tools, the live dashboard and map, duplicate merging, offices, deadlines, overdue status, the
 scorecard, officer actions, the fix-photo check by Gemma, sensitive reports, and Telegram chat: a
 real typed complaint (English) and a real voice-note complaint (Kannada) were filed end to end on
-17 Oct. Tested with fakes only so far: photos and location pins in chat, WhatsApp, and the call-back
-after a fix.
+17 Oct. Also tested for real on the live site on 17 Oct, by our tester: a location pin in a Telegram
+chat, a shop as the landmark ("Axis Bank, Dasarahalli"), switching language mid-chat, and a second
+person's report merged into an existing complaint. Tested with fakes only so far: photos in chat,
+WhatsApp, and the call-back after a fix.
 **Not built yet:** sending complaints into government systems, per-officer accounts, notifications
 for overdue complaints, cost logging, load testing, and WhatsApp messages outside its 24-hour window. The sample complaints on the dashboard are demo data. The complaint filed
 on stage is real.
