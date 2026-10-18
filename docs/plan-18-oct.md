@@ -28,17 +28,17 @@ WhatsApp is out of scope for today (built, tested with fakes, not connected).
 | B3 | Browser: optional mobile number for the call-back | ✅ deployed 18 Oct, **Tharun testing** |
 | B4 | Telegram message on every status change | ✅ deployed 18 Oct, **Tharun testing** |
 | B5 | Caller asking "what happened?" hears the full status | ✅ deployed 18 Oct, **Tharun testing** |
-| B6 | Officer's fix photo is optional | ✅ done (`fde781c`), not yet pushed |
-| B7 | Google Maps links give the exact spot (Telegram, browser) | ✅ done (`3d5ae3d`), not yet pushed |
-| C1 | Note box says it is public | ✅ done (`fde781c`), not yet pushed |
-| C2 | Photo comparison, in full, on the complaint page | to do (medium) |
-| C3 | Gemma's steps in detail | to do (small) |
-| C4 | "Calling the citizen…" shown live on the complaint page | to do (small), only if the call-back test passes |
-| C5 | Photo GPS and time check | only if time is left before 1 PM |
-| E1 | Same-named places ("MG Road") offered as distinct, described options | to do (medium) — **highest risk in a live demo** |
-| E2 | Optional pincode for a precise area | to do (medium) |
-| E3 | Same problem, same area: count, map badge, priority | mostly built; to do: radius per kind of problem (small) |
-| D1 | Judge answers and demo script updated | to do, last |
+| B6 | Officer's fix photo is optional | ✅ deployed 18 Oct, **Tharun testing** |
+| B7 | Google Maps links give the exact spot (Telegram, browser) | ✅ deployed 18 Oct, **Tharun testing** |
+| C1 | Note box says it is public | ✅ deployed 18 Oct, **Tharun testing** |
+| C2 | Photo comparison, in full, on the complaint page | ✅ done (`781c6eb`), not yet pushed |
+| C3 | Gemma's steps in detail | planned, not built |
+| C4 | "Calling the citizen…" shown live on the complaint page | not built; only if the call-back test passes |
+| C5 | Photo GPS and time check | planned, not built |
+| E1 | Same-named places ("MG Road") offered as distinct, described options | ✅ done (`66bf6a4`), not yet pushed |
+| E2 | Optional pincode for a precise area | ✅ done (`62b5529`), not yet pushed |
+| E3 | Same problem, same area: count, map badge, priority | ✅ done; radius per kind of problem (`1a54f21`), not yet pushed |
+| D1 | Judge answers and demo script updated | ✅ done (this commit), not yet pushed |
 | D2 | Morning steps: reset, smoke test, rehearse, backup video | Vinay, after the code freeze |
 
 ---

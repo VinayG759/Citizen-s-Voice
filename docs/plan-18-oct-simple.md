@@ -36,7 +36,7 @@ testing breaks, then rehearse.
 
 ---
 
-**Added late this morning (done, waiting for the next push):**
+**Added late this morning (done, pushed, Tharun is testing now):**
 
 | What you asked for | What we changed |
 |---|---|
@@ -51,26 +51,24 @@ testing breaks, then rehearse.
 - **When a citizen sends a photo:** Gemma describes what it sees ("a deep pothole"), how serious it is (1 to 5), and whether anyone is in danger. The clerk uses that, so it doesn't ask what the photo already shows.
 - **When the officer marks it fixed with a photo:** Gemma compares it with the complaint, and with the citizen's photo if there is one: does it look fixed, is it the same place, and why.
 - Gemma's view is always **advice**. It never changes a complaint by itself.
-- Today the dashboard shows only a small badge. The next task shows all of it.
+- The complaint page now shows all of it on a **Photo check** card (done, see below).
 
 ---
 
-## Still to do today (before 1 PM)
+## Done before the code freeze (not yet pushed)
 
-1. **Show the photo check properly.** The citizen's photo and the officer's "fixed" photo **side by side**, with what Gemma noticed:
-   - is it the same place?
-   - what matches in both photos (a wall, a tree, a shop sign)?
-   - what's different?
-   - how sure is it?
+| What | What we changed | Commit |
+|---|---|---|
+| The photo check, shown properly | The citizen's photo and the officer's "fixed" photo **side by side**, with what Gemma noticed: same place or not, what matches, what's different, how sure it is. The card says Gemma's check is advice; the citizen's answer decides | `781c6eb` |
+| "MG Road" and other shared names | The bot offers every real match, each named by its area ("MG Road near Shivajinagar, or the other one?"), and lets the caller choose | `66bf6a4` |
+| Pincode, if the caller knows it | Never required. The bot may ask once when the place is unclear. We know the centre of 107 Bengaluru pincodes from the map data | `62b5529` |
+| Same problem, same area | "Nearby" is 150 m for spot problems (pothole, streetlight, tree, drain) and 500 m for area-wide ones (water, power, garbage) | `1a54f21` |
+| Judge answers and demo script | Updated for everything above. The demo gets the call-back moment: the officer marks it fixed, your phone rings on stage, you say "no, it's still dark", and it reopens | this one |
 
-   Gemma's opinion is **advice**: the citizen's "yes" or "no" on the call-back is what counts.
-2. **Show Gemma's thinking in more detail.** For example: "checked for the same problem nearby: found CV-1004, 40 m away"; "sent to BBMP, 7-day deadline". Each step can be opened to see exactly what went in and came out.
-3. **Show the call-back as it happens** ("Calling the citizen…", then their answer), but only if Tharun's test shows the call-back really rings.
-4. **"MG Road" and other shared names.** Bengaluru has several MG Roads, and today the bot can pick a small village road at the city's edge. It will offer **every** real match, each named by its area ("MG Road near Shivajinagar, or MG Road in Yelahanka?"), and let the caller choose.
-5. **Pincode, if the caller knows it (never required).** The bot may ask once when the place is unclear. We already have the centre of 134 Bengaluru pincodes from the map data, so 560057 points straight at T. Dasarahalli.
-6. **Same problem, same area.** This already works: a second report of the same problem nearby joins the first, the dashboard says "2 reports", the map pin shows the count, and priority goes up. We'll make "nearby" wider for area-wide problems (no water, power cut: 500 m) and keep it tight for spot problems (a pothole: 150 m).
-7. *If time is left:* check the hidden GPS location and time stored in the officer's photo, to confirm it was taken at the right place after the complaint.
-8. **Update the judge answers and the demo script.** The demo gets a new moment: the officer marks it fixed, your phone rings on stage, you say "no, it's still dark", and it reopens.
+**Not built today (we'll say "planned" if asked):**
+- Gemma's thinking in more detail on the complaint page (for example "checked for the same problem nearby: found CV-1004, 40 m away").
+- Checking the hidden GPS location and time in the officer's photo.
+- Showing the call-back live on the page ("Calling the citizen…"): only if Tharun's test shows the call-back really rings.
 
 ---
 

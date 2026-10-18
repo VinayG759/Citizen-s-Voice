@@ -1,6 +1,6 @@
 # Judge questions — short, true answers
 
-For Vinay, before judging. Each answer matches the code as of the `cv-demo` branch (17 Oct 2026).
+For Vinay, before judging. Each answer matches the code at the code freeze (`phase-6-loop`, 18 Oct 2026).
 **"Not built yet"** means exactly that: say it plainly, then say what it would take. Never claim more
 than this page says.
 
@@ -41,10 +41,22 @@ Colab: it understood the meaning but misheard words and was slow. So Sarvam is t
 and Gemma is the brain.
 
 **5. Where is the "multimodal" (text + images) part?**
-When an officer marks a complaint fixed, they must attach a photo. Gemma 4 31B looks at it alongside
-the complaint text (and the citizen's own photo, if one exists) and answers looks fixed / not fixed /
-can't tell, with a one-line reason (`backend/app/vision.py`). The verdict is **advice shown to
-people**. It never closes a complaint by itself.
+Two places, both in `backend/app/vision.py`, both using Gemma 4 31B:
+- **The citizen's photo** (Telegram, WhatsApp): Gemma says what it sees ("a deep pothole"), how
+  serious it is (1 to 5), and whether anyone is in danger. The clerk uses that so it doesn't ask
+  again.
+- **The officer's fix photo:** Gemma compares it with the complaint and with the citizen's photo, if
+  there is one. It answers looks fixed / not fixed / can't tell, whether it's the same place, **what
+  matches** in both photos (a wall, a tree, a sign), **what differs**, how confident it is (low,
+  medium, high), and one line of reason.
+
+The complaint page shows all of it on a **Photo check** card: the two photos side by side with
+Gemma's comparison underneath, and the line "Gemma's check is advice. The citizen's answer decides."
+Code cleans Gemma's answer before anyone sees it: only known values, at most 5 short items per list.
+With no citizen photo, the card says "no citizen photo to compare" and lists nothing as matching.
+The verdict **never closes or reopens anything** by itself.
+**Honest limit:** Gemma could be fooled by a photo of a different road that looks the same. That's
+why the citizen's answer, not Gemma, decides (see 20).
 
 **6. Is any of this actually OpenRouter, not Google?**
 Google's Gemini API is always tried first. If it errors, or a live reply takes longer than 2.5 s, the
@@ -95,7 +107,32 @@ any name. Gemma never guesses a look-alike. If the caller says "no" to a place, 
 again. In a Telegram chat, Gemma asks for a **location pin**, which gives the exact spot. On a phone
 call, it files at the area (T. Dasarahalli) with the landmark in the caller's own words ("in front of
 St. Mary's Convent, Jain Temple Road"), so the officer still finds it. Tested on the live site 17 Oct.
+In Telegram or the browser, a citizen can also paste a **Google Maps link**: we read the exact spot
+from it and file there, just like a location pin. Short links (`maps.app.goo.gl/…`) are followed, but
+our server only ever opens Google addresses, so a link can't send it anywhere else. A real short link
+from the Google Maps app has **not** been tried yet.
 A paid place search (Google Places) would fill the gaps; **not built**, it needs a billing decision.
+
+**11b. Bengaluru has more than one MG Road. Which one do you pick?**
+We don't pick one; the caller does. Found 18 Oct: "MG Road" pinned a small village road at the city's
+western edge, because the map spells the central one "Mahatma Gandhi Road". Now:
+- MG, KG, JC and KR are spelled out before searching, but only before "Road" ("KR Puram" stays as it is).
+- When a name is shared, the clerk offers up to 4 genuinely different places, each named by the
+  nearest area, and asks which one: "the MG Road near Shivajinagar, or the other one?". If the caller
+  already said the area, the match there is used without asking.
+- A long road counts as one option, never as three points along it.
+- Very short words ("OMG", "MIG") only match exactly those letters, so they can't drift to "MG Road".
+Covered by tests. **Not yet tried on a real call.**
+
+**11c. Can a caller just give their pincode?**
+Yes, if they know it; it's **optional**. The clerk may ask once, and only when the place is still
+unclear: "if you know your pincode, tell me; otherwise that's fine". It never insists. The pincode's
+centre works like a named area: places inside it come first, which helps when an area name is shared
+("Dasarahalli" is three places). We know **107 Bengaluru pincodes**. Their centres are worked out
+from the postcodes already tagged on places in OpenStreetMap, so there's no new data source. A
+pincode we don't know is ignored. **Misuse:** a wrong pincode pulls the search to the wrong area,
+but the read-back names the place, so the caller hears it and can say no. Covered by tests; **not
+yet tried on a real call.**
 
 ## Speed and cost
 
@@ -161,22 +198,43 @@ An **open emergency always ranks first**, however old or often-reported the othe
 **Honest limit:** "escalated" is a label on the dashboard. Nobody is notified yet.
 
 **20. How do you know it's really fixed?**
-"Fixed" requires a photo, and Gemma checks it. If it isn't fixed, an officer can reopen it, which
-raises its urgency. **After "fixed", the citizen is asked.** We ring them (phone complaints), or message
-them on Telegram or WhatsApp. Gemma reads their answer as yes, no or unclear. A clear **yes** records
+**The citizen's answer decides.** The officer's photo is **optional**, because some fixes can't be
+photographed (a pension paid, a bus route restored). With a photo, Gemma checks it (see 5). Without
+one, the page shows publicly "No fix photo · the citizen's answer decides", so skipping photos is
+visible to everyone. An officer can reopen a complaint, which raises its urgency.
+**After "fixed", the citizen is asked.** We ring them (phone complaints, and browser complaints where
+they left a mobile number), or message them on Telegram or WhatsApp. Gemma reads their answer as yes, no or unclear. A clear **yes** records
 that the citizen confirmed it and deletes their stored contact. A clear **no** reopens the complaint
 with higher urgency. Anything else is noted on the timeline, with one retry later. Calls happen only
 between 9 AM and 8 PM, never for sensitive reports, and can be switched off (`FEATURE_CALLBACK`).
 WhatsApp only allows free messages within 24 hours of the citizen's last message; outside that
 window we don't send, and the timeline says so.
 **Honest limit:** all of this is tested with fakes. We have **not** yet had a real call-back ring a
-real phone, or a real Telegram/WhatsApp answer come back.
+real phone, or a real Telegram/WhatsApp answer come back. (If today's live test changes that, see
+"What was tested live today" below.)
+
+**20a. Does the citizen hear anything before the fix?**
+- **Telegram:** a message on **every** status change (work started, sent to another office, reopened,
+  fixed), in their language, with the officer's note. Everyone who reported the same problem gets it.
+  The officer's note box says "Shown on the public timeline and sent to the citizen".
+- **Phone and browser:** one call, after the fix. They can call the helpline any time and ask "what
+  happened to my complaint?": they hear the office, the deadline, whether it's overdue, and the
+  latest updates.
+- **No SMS.** Indian rules require every business message template to be registered first (DLT),
+  which takes days.
+
+**20b. How can you call back someone who used the browser?**
+After filing on the browser page, they can leave a 10-digit Indian mobile number. It's optional, and
+stored encrypted like a phone caller's (see 15). **Honest limit:** nothing checks the number is
+theirs; someone could enter another person's number, who would get one call. A one-time code by
+SMS would fix that; **not built** (needs SMS, above). Never asked on sensitive reports.
 
 **21. Can citizens send photos?**
 On **Telegram and WhatsApp**, yes: a citizen can send a photo (also a voice note or a location pin).
 Gemma 4 looks at it, tells the clerk what it shows so it doesn't ask again, and the photo is kept with
 the complaint, up to 3 per complaint. **Not on the phone line**, which is voice only, and there is no
-upload on the browser page. Tested with fakes; not yet tried by a real citizen.
+upload on the browser page (a Google Maps link works there for the place). Tested with fakes; not yet
+tried by a real citizen.
 
 **22. What happens in an emergency?**
 Gemma tells the caller to **call 112** at once (181 for harassment of a woman, 1098 for a child in
@@ -190,7 +248,10 @@ emergency flag on the dashboard.
 Limits in code: 5 calls per hour per phone number, 6 minutes per call, 30 turns per conversation, and
 the browser page allows 20 turns per 10 minutes per visitor. A call's audio can only be opened through
 a one-time link our server gives the phone company, so nobody can connect directly and spend our
-credits. Repeat reports of the same problem within 150 m are merged into one tracking number. **Not
+credits. Repeat reports of the same problem nearby are merged into one tracking number: within
+**150 m** for a spot problem (pothole, streetlight, tree, drain), within **500 m** for one that hits a
+whole street (water, power, garbage). Gemma still decides whether it's really the same problem and
+tells the caller. Sensitive reports are never merged. **Not
 handled yet:** faked caller numbers, and checking that a report is true. An officer is the final check.
 
 **24. Officer accounts?**
@@ -227,15 +288,26 @@ We have not compared our accuracy or speed with theirs.
 **29. What's really built versus planned?**
 Built and tested: the phone line (a few real calls), the browser page, the Gemma clerk with its five
 tools, the live dashboard and map, duplicate merging, offices, deadlines, overdue status, the
-scorecard, officer actions, the fix-photo check by Gemma, sensitive reports, and Telegram chat: a
+scorecard, officer actions, the Photo check card (Gemma compares the citizen's and the officer's
+photos), sensitive reports, and Telegram chat: a
 real typed complaint (English) and a real voice-note complaint (Kannada) were filed end to end on
 17 Oct. Also tested for real on the live site on 17 Oct, by our tester: a location pin in a Telegram
 chat, a shop as the landmark ("Axis Bank, Dasarahalli"), switching language mid-chat, and a second
-person's report merged into an existing complaint. Tested with fakes only so far: photos in chat,
-WhatsApp, and the call-back after a fix.
+person's report merged into an existing complaint. Built on 18 Oct, covered by tests, live testing
+still to come: optional fix photo, Google Maps links, browser numbers for the call-back, Telegram
+updates on every status change, the full status for phone callers, the shared-name question ("which
+MG Road?"), the optional pincode, the 150 m / 500 m same-problem distance, and the Photo check card. Tested with fakes only
+so far: photos in chat, WhatsApp, and the call-back after a fix.
 **Not built yet:** sending complaints into government systems, per-officer accounts, notifications
 for overdue complaints, cost logging, load testing, and WhatsApp messages outside its 24-hour window. The sample complaints on the dashboard are demo data. The complaint filed
 on stage is real.
+
+## What was tested live today
+
+Only what our tester actually tried on the live site on 18 Oct. If it isn't listed here, say "tested
+with fakes" or "not yet tried".
+
+- (Vinay fills in from Tharun's report)
 
 ---
 
