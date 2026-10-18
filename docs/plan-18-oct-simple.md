@@ -66,8 +66,11 @@ testing breaks, then rehearse.
    Gemma's opinion is **advice**: the citizen's "yes" or "no" on the call-back is what counts.
 2. **Show Gemma's thinking in more detail.** For example: "checked for the same problem nearby: found CV-1004, 40 m away"; "sent to BBMP, 7-day deadline". Each step can be opened to see exactly what went in and came out.
 3. **Show the call-back as it happens** ("Calling the citizen…", then their answer), but only if Tharun's test shows the call-back really rings.
-4. *If time is left:* check the hidden GPS location and time stored in the officer's photo, to confirm it was taken at the right place after the complaint.
-5. **Update the judge answers and the demo script.** The demo gets a new moment: the officer marks it fixed, your phone rings on stage, you say "no, it's still dark", and it reopens.
+4. **"MG Road" and other shared names.** Bengaluru has several MG Roads, and today the bot can pick a small village road at the city's edge. It will offer **every** real match, each named by its area ("MG Road near Shivajinagar, or MG Road in Yelahanka?"), and let the caller choose.
+5. **Pincode, if the caller knows it (never required).** The bot may ask once when the place is unclear. We already have the centre of 134 Bengaluru pincodes from the map data, so 560057 points straight at T. Dasarahalli.
+6. **Same problem, same area.** This already works: a second report of the same problem nearby joins the first, the dashboard says "2 reports", the map pin shows the count, and priority goes up. We'll make "nearby" wider for area-wide problems (no water, power cut: 500 m) and keep it tight for spot problems (a pothole: 150 m).
+7. *If time is left:* check the hidden GPS location and time stored in the officer's photo, to confirm it was taken at the right place after the complaint.
+8. **Update the judge answers and the demo script.** The demo gets a new moment: the officer marks it fixed, your phone rings on stage, you say "no, it's still dark", and it reopens.
 
 ---
 

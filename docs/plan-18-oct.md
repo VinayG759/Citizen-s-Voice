@@ -35,6 +35,9 @@ WhatsApp is out of scope for today (built, tested with fakes, not connected).
 | C3 | Gemma's steps in detail | to do (small) |
 | C4 | "Calling the citizen…" shown live on the complaint page | to do (small), only if the call-back test passes |
 | C5 | Photo GPS and time check | only if time is left before 1 PM |
+| E1 | Same-named places ("MG Road") offered as distinct, described options | to do (medium) — **highest risk in a live demo** |
+| E2 | Optional pincode for a precise area | to do (medium) |
+| E3 | Same problem, same area: count, map badge, priority | mostly built; to do: radius per kind of problem (small) |
 | D1 | Judge answers and demo script updated | to do, last |
 | D2 | Morning steps: reset, smoke test, rehearse, backup video | Vinay, after the code freeze |
 
@@ -139,6 +142,30 @@ Both are advice: Gemma never changes a status. C2 below makes all of it visible.
 - **Value:** a fact, not an opinion: "taken 30 m from the complaint, 2 h after it was filed".
 - **Simplest version:** read the EXIF location and time from the officer's uploaded photo; show the distance from the complaint pin and whether it was taken after filing.
 - **Limit:** Telegram strips EXIF and many phones turn location off; it helps only sometimes. Never blocks marking fixed.
+
+### E1 — Same-named places, offered as distinct options (medium)
+- **Value:** every caller who names a common place; a judge may well say "MG Road".
+- **Found 18 Oct:** `find("MG Road")` ranks a village road "M G Road" at the city's western edge (13.10, 77.40) first, ahead of the central MG Road (spelled "Mahatma Gandhi Road" in OpenStreetMap); short look-alike names ("OMG", "MIG") reach the list because "road" is dropped from the query and "mg" is tiny; and matches carry no area, so the clerk can't ask "the one near Trinity, or the one in Yelahanka?".
+- **Simplest version:**
+  - well-known initials expand before searching: MG → Mahatma Gandhi, KG → Kempegowda, JC → Jayachamarajendra, KR → Krishna Rajendra;
+  - a query of 3 letters or fewer only matches names that are the same letters, never a fuzzy look-alike;
+  - each match carries **where** it is: the nearest neighbourhood or suburb ("near Shivajinagar");
+  - points of one long road within 4 km count as one option, so a single road is never offered as three;
+  - up to 4 genuinely different places are returned, and the clerk asks the caller to choose, naming each by where it is.
+- **Replaces:** the top-scoring match being read back on its own.
+- **Tests:** "MG Road" offers the central one with its area; "MG Road, Yelahanka" (if one exists there) picks that one; "OMG" never matches "MG Road".
+
+### E2 — Optional pincode (medium)
+- **Value:** callers who know their pincode get the right area, even when the area's name is shared ("Dasarahalli" is three places).
+- **Data, no new source:** our cached OpenStreetMap download holds `addr:postcode` on many places: **134 Bengaluru pincodes**, 111 with 5+ points. The median point of each is its centre (560057 → 13.049, 77.509, T. Dasarahalli; 560001 → MG Road; 560064 → Yelahanka). Built into `data/pincodes.json` by `build_places.py`.
+- **Simplest version:** `find_place` takes an optional `pincode`; its centre acts like the area's centre (places within 4 km come first, others are not read back). The clerk may ask **once**, and only when the place is unclear: "if you know the pincode, tell me; otherwise that's fine". Never required. A pincode we don't know is ignored.
+- **Misuse:** a wrong pincode pulls the search towards the wrong area; the read-back (which names the place) catches it.
+
+### E3 — Same problem, same area (mostly built)
+- **Built:** a second report of the same problem within **150 m** is added to the first: one tracking ID, the dashboard row says "N reports", the map pin shows a count badge, priority rises 6 points per extra report, urgency rises by one every 3rd report. Live example: CV-1004 (phone + Telegram).
+- **Limit:** 150 m suits a pothole or a streetlight, but not a whole street without water or power.
+- **Simplest version:** the radius depends on the kind of problem: 150 m for point problems (road, streetlight, trees, drainage), 500 m for area-wide ones (water, electricity, garbage). Gemma still decides whether it is the *same* problem and tells the caller.
+- **Misuse:** a wider radius could merge two different problems; Gemma's check and the caller's read-back stay in place.
 
 ### D1 — Documents (last)
 - `docs/judge-questions.md`: Q9/Q10 (photo check, transparency), browser call-back numbers, Telegram updates, what was tested live today; WhatsApp stays "built, not connected".
