@@ -148,3 +148,14 @@ def test_no_number_before_the_complaint_is_filed(monkeypatch):
     sid = filed_session(monkeypatch)
     try_it._sessions[sid][0].state.filed = None
     assert client.post("/api/try/contact", json={"session_id": sid, "phone": "9845012345"}).status_code == 409
+
+
+def test_a_google_maps_link_typed_in_the_browser_is_the_exact_spot(monkeypatch):
+    told = []
+    monkeypatch.setattr(clerk_mod.router, "generate",
+                        lambda **k: told.append(k["messages"][-1].text) or LLMReply("ok", [], "f", "f", 1))
+    sid = start()
+    r = client.post("/api/try/turn", data={"session_id": sid,
+                                           "text": "garbage https://maps.google.com/?q=13.0433,77.5126"})
+    assert r.status_code == 200 and "Google Maps link" in told[0]
+    assert "pin:13.04330,77.51260" in try_it._sessions[sid][0].state.offered

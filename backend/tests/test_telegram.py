@@ -285,3 +285,22 @@ def test_an_unclear_answer_is_recorded_and_the_message_still_reaches_the_clerk(a
 def test_no_question_without_a_bot_token(monkeypatch, answers):
     monkeypatch.setattr(get_settings(), "telegram_bot_token", "")
     assert telegram.ask_fixed(str(CHAT), 1042, COMPLAINT) is False and FakeApi.sent == []
+
+
+def test_a_google_maps_link_is_used_as_the_exact_spot(monkeypatch):
+    # 18 Oct: citizens paste a Google Maps link for a precise location.
+    told = []
+    monkeypatch.setattr(clerk_mod.router, "generate",
+                        lambda **k: told.append(k["messages"][-1].text) or LLMReply("ok", [], "f", "f", 1))
+    post({"text": "pothole here https://www.google.com/maps/place/X/@13.0433,77.5126,17z please fix"})
+    assert "Google Maps link" in told[0] and "https://" not in told[0]
+    assert "pin:13.04330,77.51260" in telegram.clerk._chats[str(CHAT)].conv.state.offered
+
+
+def test_an_unreadable_maps_link_makes_the_clerk_ask_for_a_landmark(monkeypatch):
+    told = []
+    monkeypatch.setattr(chat.maps_link, "location", lambda url: None)
+    monkeypatch.setattr(clerk_mod.router, "generate",
+                        lambda **k: told.append(k["messages"][-1].text) or LLMReply("ok", [], "f", "f", 1))
+    post({"text": "pothole https://maps.app.goo.gl/broken"})
+    assert "could not be read" in told[0]

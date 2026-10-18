@@ -98,7 +98,8 @@ CHAT_PIN = """
 IN THIS CHAT
 - The citizen can send a location pin. If find_place can't find their place, or they say the place \
 you offered is wrong, ask them first to send a location pin of the problem spot (in Telegram: the \
-paperclip, then Location). Use the pin when it comes. Only if they can't, file at the area as above."""
+paperclip, then Location) or a Google Maps link to it. Use the pin when it comes. Only if they can't, \
+file at the area as above."""
 
 
 def system_prompt(state: ToolState, language: str | None, switching_to: str | None = None,

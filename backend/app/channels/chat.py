@@ -23,7 +23,7 @@ from app.clerk.language import guess_language
 from app.db import repo as db
 from app.db.models import CATEGORIES
 from app.db.repo import Repo, save_turn
-from app.places import gazetteer
+from app.places import gazetteer, maps_link
 from app.settings import get_settings
 from app.speech import sarvam
 from app.tools.clerk_tools import OfferedPlace, spoken_id
@@ -43,7 +43,7 @@ AWAIT_ANSWER_S = 3 * 24 * 3600  # an unanswered "is it really fixed?" is forgott
 WELCOME = ("ನಮಸ್ಕಾರ, Citizen's Voice ಗೆ ಸ್ವಾಗತ. ನಿಮ್ಮ ಏರಿಯಾದ problem ಬಗ್ಗೆ type ಮಾಡಿ ಅಥವಾ voice message ಕಳಿಸಿ.\n"
            "नमस्ते! अपने इलाके की problem लिखिए या voice message भेजिए।\n"
            "Hello! Tell me about a problem in your area: type it or send a voice note. "
-           "You can also send a photo or your location.")
+           "You can also send a photo, your location, or a Google Maps link to the exact spot.")
 BUSY = "ತುಂಬಾ messages ಬಂದಿವೆ, ಸ್ವಲ್ಪ ಹೊತ್ತು ಬಿಟ್ಟು ಕಳಿಸಿ. / Too many messages: please try again in a few minutes."
 NOT_HEARD = "ಕ್ಷಮಿಸಿ, ಕೇಳಿಸಲಿಲ್ಲ. ಮತ್ತೆ ಕಳಿಸ್ತೀರಾ? / Sorry, I couldn't hear that. Could you send it again?"
 HOW_TO = ("ದಯವಿಟ್ಟು text, voice message, photo ಅಥವಾ location ಕಳಿಸಿ. / "
@@ -153,6 +153,10 @@ class ChatClerk:
         notes = []
         if msg.location:
             notes.append(self._pin(chat.conv, *msg.location))
+        elif words:
+            words, link_note = with_maps_link(chat.conv, words)
+            if link_note:
+                notes.append(link_note)
         if msg.photo:
             notes.append(self._photo(chat, msg.photo))
 
@@ -225,19 +229,7 @@ class ChatClerk:
                             contact_enc=contact.seal(self.channel, chat_id), written=True)
 
     def _pin(self, conv: Conversation, lat: float, lon: float) -> str:
-        """A location pin becomes a place the clerk may file at, without asking where."""
-        near, km = _nearest_place(lat, lon)
-        if near is None or km > PIN_MAX_KM:
-            return ("[The citizen shared a location pin, but it is outside Bengaluru. Tell them we only take "
-                    "complaints in Bengaluru.]")
-        label = f"Location pin near {near.label}" if km <= 2 else f"Location pin ({lat:.5f}, {lon:.5f})"
-        pid = f"pin:{lat:.5f},{lon:.5f}"
-        place = gazetteer.Place(pid, label, "", "pin", round(lat, 6), round(lon, 6), near.area)
-        # Offered as of the turn BEFORE this one: the citizen chose the place by pinning it, so it
-        # counts as confirmed and the complaint can be filed there without a read-back of the place.
-        conv.state.offered[pid] = OfferedPlace(place, conv.state.caller_turn)
-        return (f"[The citizen shared their location pin: {label} [{pid}]. Use it as the place of the problem: "
-                "do not ask where it is and do not call find_place for it.]")
+        return pin_note(conv, lat, lon)
 
     def _photo(self, chat: Chat, photo: tuple[str, bytes]) -> str:
         """Gemma looks at the photo; the clerk is told what it shows; it waits for the filing."""
@@ -305,6 +297,36 @@ class ChatClerk:
             self._times.clear()
             self._seen_at.clear()
             self._awaiting.clear()
+
+
+def pin_note(conv: Conversation, lat: float, lon: float, what: str = "location pin") -> str:
+    """A location pin (or a Google Maps link) becomes a place the clerk may file at, without asking where."""
+    near, km = _nearest_place(lat, lon)
+    if near is None or km > PIN_MAX_KM:
+        return (f"[The citizen shared a {what}, but it is outside Bengaluru. Tell them we only take "
+                "complaints in Bengaluru.]")
+    label = f"Location pin near {near.label}" if km <= 2 else f"Location pin ({lat:.5f}, {lon:.5f})"
+    pid = f"pin:{lat:.5f},{lon:.5f}"
+    place = gazetteer.Place(pid, label, "", "pin", round(lat, 6), round(lon, 6), near.area)
+    # Offered as of the turn BEFORE this one: the citizen chose the place by pinning it, so it
+    # counts as confirmed and the complaint can be filed there without a read-back of the place.
+    conv.state.offered[pid] = OfferedPlace(place, conv.state.caller_turn)
+    return (f"[The citizen shared their {what}: {label} [{pid}]. Use it as the place of the problem: "
+            "do not ask where it is and do not call find_place for it.]")
+
+
+def with_maps_link(conv: Conversation, words: str) -> tuple[str, str | None]:
+    """A Google Maps link in the citizen's words (18 Oct: for a precise spot in chats and the browser):
+    the words without the link, and a note for the clerk (the pin, or that the link couldn't be read)."""
+    link = maps_link.find(words)
+    if not link:
+        return words, None
+    rest = " ".join(words.replace(link, " ").split())
+    spot = maps_link.location(link)
+    if spot is None:
+        return rest, ("[The citizen sent a Google Maps link, but it could not be read. Ask them for a nearby "
+                      "landmark, or (in a chat) to send their location pin.]")
+    return rest, pin_note(conv, *spot, what="Google Maps link")
 
 
 def _written(reply: str, conv: Conversation) -> str:

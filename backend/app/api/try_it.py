@@ -21,6 +21,7 @@ import re
 from pydantic import BaseModel
 
 from app import events
+from app.channels.chat import with_maps_link
 from app.contact import seal
 from app.clerk.clerk import Conversation
 from app.clerk.language import guess_language, written_in
@@ -147,7 +148,8 @@ def turn(
     if not caller_text:
         raise HTTPException(422, "nothing heard")
 
-    result = conv.turn(caller_text, language)
+    words, link_note = with_maps_link(conv, caller_text)  # a pasted Google Maps link: the exact spot
+    result = conv.turn(" ".join(x for x in (words, link_note) if x), language)
     with _lock:
         _sessions[session_id] = (conv, time.time())
     # The reply goes back now; its voice is fetched separately (/speak) and history is saved after.
