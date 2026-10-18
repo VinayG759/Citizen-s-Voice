@@ -90,13 +90,22 @@ test("an officer signs in, sees the actions, and the token goes with each reques
   expect(JSON.parse(String(sent?.init?.body))).toEqual({ status: "in_progress", note: null });
 });
 
-test("marking fixed without a photo is stopped before anything is sent", async () => {
+test("an officer can mark fixed without a photo, and the page says no photo was given", async () => {
+  // 18 Oct: not every fix can be photographed (a pension paid); the photo is optional.
   setOfficerToken("123.abc");
-  mockFetch({ "/api/complaints/CV-1004": DETAIL });
+  mockFetch({ "/api/complaints/CV-1004": DETAIL, "/api/complaints/CV-1004/fixed": { ...DETAIL, status: "fixed" } });
   render(<ComplaintPage trackingId="CV-1004" />);
+  expect(await screen.findByText("Shown on the public timeline and sent to the citizen.")).toBeInTheDocument();
   fireEvent.click(await screen.findByRole("button", { name: "Mark fixed" }));
-  expect(await screen.findByText("Add a photo of the fixed problem first.")).toBeInTheDocument();
-  expect(calls.some((c) => c.path.endsWith("/fixed"))).toBe(false);
+  expect(await screen.findByText("Marked fixed without a photo; the citizen will be asked to confirm.")).toBeInTheDocument();
+  const sent = calls.find((c) => c.path === "/api/complaints/CV-1004/fixed");
+  expect((sent?.init?.body as FormData).has("photo")).toBe(false);
+});
+
+test("a complaint fixed without a photo says so publicly", async () => {
+  mockFetch({ "/api/complaints/CV-1004": { ...DETAIL, status: "fixed", photos: [] } });
+  render(<ComplaintPage trackingId="CV-1004" />);
+  expect(await screen.findByText("No fix photo · the citizen's answer decides")).toBeInTheDocument();
 });
 
 test("a wrong passcode says so and stays signed out", async () => {

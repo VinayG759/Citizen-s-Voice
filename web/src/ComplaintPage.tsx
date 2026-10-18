@@ -161,6 +161,9 @@ function Detail({ c, officer, onChanged }: { c: ComplaintDetail; officer: boolea
             <Badge tone={urgencyTone(c)}>{urgencyLabel(c)}</Badge>
             <Badge tone={c.status === "fixed" ? "success" : "neutral"}>{STATUS_LABEL[c.status]}</Badge>
             {c.overdue && <Badge tone="warning">Overdue · escalated</Badge>}
+            {c.status === "fixed" && !c.photos.some((p) => p.kind === "fix") && (
+              <Badge tone="warning">No fix photo · the citizen's answer decides</Badge>
+            )}
           </div>
           <p className="detail__summary">{c.summary_en}</p>
           {c.summary_local && <p className="detail__local">{c.summary_local}</p>}
@@ -301,14 +304,16 @@ function OfficerActions({ c, onChanged }: { c: ComplaintDetail; onChanged: () =>
 
   function markFixed(e: FormEvent) {
     e.preventDefault();
-    if (!photo) {
-      toast.error("Add a photo of the fixed problem first.");
-      return;
-    }
     const form = new FormData();
-    form.append("photo", photo);
+    if (photo) form.append("photo", photo); // optional: not every fix can be photographed
     if (note.trim()) form.append("note", note.trim());
-    void run("fixed", () => postForm(`${base}/fixed`, form), "Marked fixed. Gemma checked the photo; the citizen will be asked to confirm.");
+    void run(
+      "fixed",
+      () => postForm(`${base}/fixed`, form),
+      photo
+        ? "Marked fixed. Gemma checked the photo; the citizen will be asked to confirm."
+        : "Marked fixed without a photo; the citizen will be asked to confirm.",
+    );
   }
 
   const note_ = note.trim() || null;
@@ -316,9 +321,10 @@ function OfficerActions({ c, onChanged }: { c: ComplaintDetail; onChanged: () =>
     <Card title="Officer actions">
       <div className="actions">
         <label className="field__label" htmlFor="note">
-          Note (optional, shown on the timeline)
+          Note (optional)
         </label>
-        <input id="note" className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Crew sent, work starts Monday" />
+        <input id="note" className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Crew sent, work starts Monday" aria-describedby="note-hint" />
+        <p id="note-hint" className="actions__hint">Shown on the public timeline and sent to the citizen.</p>
 
         <div className="actions__row">
           {c.status !== "in_progress" && c.status !== "fixed" && (
@@ -344,7 +350,7 @@ function OfficerActions({ c, onChanged }: { c: ComplaintDetail; onChanged: () =>
         {c.status !== "fixed" && (
           <form className="actions__row" onSubmit={markFixed}>
             <label className="btn btn--secondary">
-              <Camera size={14} aria-hidden="true" /> {photo ? photo.name : "Choose photo"}
+              <Camera size={14} aria-hidden="true" /> {photo ? photo.name : "Add photo (optional)"}
               <input
                 type="file"
                 accept="image/*"

@@ -158,25 +158,28 @@ def route(tracking_id: str, body: Route, background: BackgroundTasks) -> dict:
 
 
 @router.post("/complaints/{tracking_id}/fixed", dependencies=[Depends(officer.require_officer)])
-def mark_fixed(tracking_id: str, background: BackgroundTasks, photo: UploadFile = File(...),
+def mark_fixed(tracking_id: str, background: BackgroundTasks, photo: UploadFile | None = File(None),
                note: str | None = Form(None)) -> dict:
-    """An officer marks it fixed WITH a photo. Gemma checks the photo against the complaint (advice,
-    shown to everyone); the citizen is then asked to confirm (see app/followup.py)."""
+    """An officer marks it fixed, with a photo if there is one. Gemma checks the photo against the
+    complaint (advice, shown to everyone); the citizen is then asked to confirm (see app/followup.py).
+    The photo is optional (18 Oct: not every fix can be photographed, e.g. a pension paid); without one
+    the timeline says so publicly and the citizen's answer is the only check."""
     number = _number(tracking_id)
-    data = photo.file.read(MAX_PHOTO_BYTES + 1)
-    if len(data) > MAX_PHOTO_BYTES:
-        raise HTTPException(413, "photo too large (5 MB max)")
-    mime = photo.content_type or "image/jpeg"
-    if not mime.startswith("image/"):
-        raise HTTPException(422, "that is not a photo")
     _, current = repo.contact_for(number)
     if current is None:
         raise HTTPException(404, "no such complaint")
-    verdict = None
-    if get_settings().feature_photo_check:
-        verdict = vision.check_fix((mime, data), current, repo.citizen_photo(number))
-    repo.add_photo(number, "fix", mime, data, verdict)
-    reason = f"Gemma: {verdict['looks_fixed']} — {verdict.get('reason', '')}" if verdict else None
+    verdict, reason = None, "marked fixed without a photo"
+    if photo is not None:
+        data = photo.file.read(MAX_PHOTO_BYTES + 1)
+        if len(data) > MAX_PHOTO_BYTES:
+            raise HTTPException(413, "photo too large (5 MB max)")
+        mime = photo.content_type or "image/jpeg"
+        if not mime.startswith("image/"):
+            raise HTTPException(422, "that is not a photo")
+        if get_settings().feature_photo_check:
+            verdict = vision.check_fix((mime, data), current, repo.citizen_photo(number))
+        repo.add_photo(number, "fix", mime, data, verdict)
+        reason = f"Gemma: {verdict['looks_fixed']} — {verdict.get('reason', '')}" if verdict else None
     updated = repo.change_status(number, "fixed", "officer", " · ".join(x for x in (note, reason) if x))
     events.publish("complaint_updated", tracking_id=updated["tracking_id"], status="fixed",
                    gemma=(verdict or {}).get("looks_fixed"))

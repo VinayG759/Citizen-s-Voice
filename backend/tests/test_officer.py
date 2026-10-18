@@ -2,6 +2,7 @@
 
 from datetime import datetime, timedelta, timezone
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app import main, officer
@@ -97,6 +98,22 @@ def test_fixed_needs_a_real_photo_and_gemma_looks_at_it(monkeypatch):
                        headers=h).status_code == 422
     r = client.post("/api/complaints/CV-1004/fixed", files={"photo": ("a.jpg", b"jpegbytes", "image/jpeg")}, headers=h)
     assert r.status_code == 200 and r.json()["gemma_verdict"]["looks_fixed"] == "yes"
+
+
+def test_fixed_without_a_photo_is_allowed_and_says_so_in_the_timeline(monkeypatch):
+    # 18 Oct: not every fix can be photographed (a pension paid, a bus route restored).
+    monkeypatch.setattr(officer.get_settings(), "officer_passcode", "ward-42")
+    token = client.post("/api/officer/login", json={"passcode": "ward-42"}).json()["token"]
+    notes = []
+    monkeypatch.setattr(api.repo, "contact_for", lambda n: (None, complaint()))
+    monkeypatch.setattr(api.repo, "add_photo", lambda *a: pytest.fail("no photo to store"))
+    monkeypatch.setattr(api.vision, "check_fix", lambda *a: pytest.fail("nothing for Gemma to check"))
+    monkeypatch.setattr(api.repo, "change_status",
+                        lambda n, st, by, note=None: notes.append(note) or complaint(status=st))
+    r = client.post("/api/complaints/CV-1004/fixed", data={"note": "Pension paid"},
+                    headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 200 and r.json()["gemma_verdict"] is None
+    assert notes == ["Pension paid · marked fixed without a photo"]
 
 
 def test_scorecard_counts_per_office(monkeypatch):

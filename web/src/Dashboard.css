@@ -360,6 +360,12 @@
   gap: var(--space-3);
 }
 
+.actions__hint {
+  margin-top: calc(-1 * var(--space-2));
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
 .actions__row {
   display: flex;
   flex-wrap: wrap;
