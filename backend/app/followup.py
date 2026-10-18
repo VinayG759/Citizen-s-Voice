@@ -24,6 +24,7 @@ from app.llm import router
 from app.llm.types import LLMError, Msg
 from app.phone import outbound
 from app.settings import get_settings
+from app.speech import sarvam
 
 log = logging.getLogger(__name__)
 
@@ -75,17 +76,33 @@ _NOTE = {"en": " Officer's note: {note}", "kn": " Officer note: {note}", "hi": "
 
 
 def update_text(what: str, tracking_number: int, language: str | None, note: str | None = None,
-                office: str | None = None) -> str:
+                office: str | None = None, translated: str | None = None) -> str:
+    """translated: the note in the citizen's language; the officer's own words are kept beside it."""
     lang = (language or "en").split("-")[0]
     lang = lang if lang in _UPDATE[what] else "en"
     text = _UPDATE[what][lang].format(tid=f"CV-{tracking_number}", office=office or "")
-    return text + (_NOTE[lang].format(note=note.strip()[:300]) if note and note.strip() else "")
+    note = note.strip()[:300] if note else ""
+    if note and translated and translated.strip() and translated.strip() != note:
+        note = f"{translated.strip()[:300]} (Officer wrote: {note})"
+    return text + (_NOTE[lang].format(note=note) if note else "")
+
+
+def _translated(note: str | None, language: str | None, done: dict[str, str | None]) -> str | None:
+    """The officer's note in the citizen's language (officers mostly write English), or None to send it
+    as written. One Sarvam call per language per update, however many people reported it."""
+    lang = (language or "en").split("-")[0]
+    if not note or not note.strip() or lang == "en":
+        return None
+    if lang not in done:
+        done[lang] = sarvam.translate(note.strip()[:300], f"{lang}-IN")
+    return done[lang]
 
 
 def notify_update(tracking_number: int, what: str, note: str | None = None, office: str | None = None) -> None:
     """Tell everyone who reported it in a chat (the original reporter and any linked reports) what changed.
     "fixed": the original reporter gets the "is it really fixed?" question instead (ask_citizen), so only
     the others get this message. Best effort: a message that can't be sent never blocks the officer."""
+    done: dict[str, str | None] = {}
     for sealed, original, language in repo.reporter_contacts(tracking_number):
         if what == "fixed" and original:
             continue
@@ -93,7 +110,9 @@ def notify_update(tracking_number: int, what: str, note: str | None = None, offi
         if contact is None or contact[0] not in _chat_notifiers:
             continue  # phone and browser citizens: called once, after the fix
         try:
-            _chat_notifiers[contact[0]](contact[1], update_text(what, tracking_number, language, note, office))
+            translated = _translated(note, language, done)
+            _chat_notifiers[contact[0]](contact[1], update_text(what, tracking_number, language, note, office,
+                                                                translated))
         except Exception:
             log.exception("status update for CV-%s not sent on %s", tracking_number, contact[0])
 

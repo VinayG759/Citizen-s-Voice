@@ -37,10 +37,11 @@ class Settings(BaseSettings):
     # The fix-photo check: an officer waits after "mark fixed", so Google gets this long, not the background 60 s.
     photo_check_google_timeout_s: float = 25
 
-    # Sarvam — speech to text and text to speech.
+    # Sarvam — speech to text, text to speech, and translating officers' notes.
     sarvam_api_key: str = ""
     sarvam_stt_model: str = "saaras:v3"  # codemix mode keeps English words in English letters
     sarvam_tts_model: str = "bulbul:v3"
+    sarvam_translate_model: str = "mayura:v1"
     # The clerk's voice: chosen by Vinay from ten samples (16 Oct) — the default sounded curt.
     sarvam_tts_speaker: str = "roopa"
     sarvam_tts_pace: float = 0.95  # a touch slower than normal: easier on a phone line
