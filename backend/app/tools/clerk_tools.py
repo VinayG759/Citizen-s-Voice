@@ -121,7 +121,11 @@ def find_place(state: ToolState, query: str, area: str | None = None, road: str 
     matches: list[gazetteer.Match] = []
     pin = gazetteer.pincode_centre(pincode)
     where_asked = area or (f"pincode {pin.name_en}" if pin else None)
-    for m in gazetteer.find(query, area, limit=12, pincode=pincode):
+    found = gazetteer.find(query, area, limit=12, pincode=pincode)
+    # Places carrying the caller's own distinctive words ("St. Mary's") are the real alternatives, ahead of
+    # look-alikes ("St. Paul's"). Tester, 18 Oct: four St. Mary's schools, and the clerk "could only see one".
+    found = found[:1] + sorted(found[1:], key=lambda m: gazetteer._distinctive_match(query, m.place) < 90)
+    for m in found:
         # "Presidency University Hostel" is part of "Presidency University": same place for a caller.
         if matches and m.place.label.lower().startswith(matches[0].place.label.lower() + " "):
             continue
@@ -158,12 +162,15 @@ def find_place(state: ToolState, query: str, area: str | None = None, road: str 
                         "km away. Do not read these back. Ask for a nearby landmark, bus stop or road in "
                         f"{where_asked}, then search again."
                         + (f" If that fails too, file at {area} itself with their landmark in words." if area else "")}
-    shared = [d for d in out if gazetteer.normalise(d["name"]) == gazetteer.normalise(out[0]["name"])]
+    kinds = gazetteer._wanted_kinds(query)
+    shared = [d for m, d in zip(matches, out)
+              if gazetteer.normalise(d["name"]) == gazetteer.normalise(out[0]["name"])
+              or (kinds and m.place.kind in kinds and gazetteer._distinctive_match(query, m.place) >= 90)]
     # A suburb is the famous one ("Koramangala"): no need to ask about a village of that name 40 km out.
     if len(shared) > 1 and not where_asked and matches[0].place.kind not in ("suburb", "town"):
         where = ", ".join(f"near {d['where']}" for d in shared)
         return {"matches": out,
-                "note": f"{len(shared)} different places share this name ({where}). Ask the caller which one, "
+                "note": f"{len(shared)} different places match this name ({where}). Ask the caller which one, "
                         "naming each by where it is, unless what they said already tells you. "
                         "If the caller says it is not the place, never offer it again."}
     return {

@@ -163,19 +163,19 @@ def test_shared_names_are_offered_by_where_they_are():
     assert 2 <= len(out["matches"]) <= clerk_tools.OPTIONS
     assert out["matches"][0]["where"] == "Shivajinagar"
     assert len({m["where"] for m in out["matches"]}) == len(out["matches"])
-    assert "share this name" in out["note"] and "near Shivajinagar" in out["note"]
+    assert "match this name" in out["note"] and "near Shivajinagar" in out["note"]
 
 
 def test_a_famous_suburb_is_not_questioned():
     from app.tools import clerk_tools
     out = clerk_tools.find_place(clerk_tools.ToolState(), "Koramangala")
-    assert "share this name" not in out["note"]
+    assert "match this name" not in out["note"]
 
 
 def test_with_the_area_named_the_match_there_is_used():
     from app.tools import clerk_tools
     out = clerk_tools.find_place(clerk_tools.ToolState(), "MG Road", "Shivajinagar")
-    assert out["matches"][0]["where"] == "Shivajinagar" and "share this name" not in out["note"]
+    assert out["matches"][0]["where"] == "Shivajinagar" and "match this name" not in out["note"]
 
 
 # ---- optional pincode (plan E2): one more "where", never required ----
@@ -183,7 +183,7 @@ def test_with_the_area_named_the_match_there_is_used():
 def test_a_pincode_picks_the_right_namesake():
     from app.tools import clerk_tools
     out = clerk_tools.find_place(clerk_tools.ToolState(), "Dasarahalli", pincode="560057")
-    assert out["matches"][0]["km_from_area"] < 2 and "share this name" not in out["note"]
+    assert out["matches"][0]["km_from_area"] < 2 and "match this name" not in out["note"]
     m = g.find("Dasarahalli", pincode="560057")[0].place
     assert g.km_between(m.lat, m.lon, *T_DASARAHALLI) < 2
 
@@ -201,3 +201,14 @@ def test_an_unknown_pincode_is_ignored(pincode):
 def test_pincode_centres_are_real():
     c = g.pincode_centre("560 001")  # spaces as a caller might say it
     assert c and g.km_between(c.lat, c.lon, *CENTRAL_MG_ROAD) < 1.5
+
+
+def test_schools_sharing_the_callers_words_are_offered_not_look_alikes():
+    # Tester, 18 Oct: "St. Marys Public School Road", "not Shivajinagar", and the clerk could offer no other
+    # St. Mary's: the alternatives were St. Paul's and St. Thomas, and a different spelling hid the real ones.
+    from app.tools import clerk_tools
+    out = clerk_tools.find_place(clerk_tools.ToolState(), "St. Marys Public School Road")
+    schools = [m for m in out["matches"] if m["kind"] == "school"]
+    assert len(schools) >= 3 and all("Mary" in m["name"] for m in schools)
+    assert len({m["where"] for m in schools}) == len(schools)
+    assert "match this name" in out["note"]

@@ -116,7 +116,8 @@ def _stem(text: str) -> tuple[str, bool]:
 _GENERIC = {"railway", "station", "bus", "stand", "stop", "hospital", "clinic", "school", "college",
             "temple", "church", "mosque", "park", "market", "circle", "junction", "layout", "colony",
             "flyover", "bridge", "lake", "tank", "post", "office", "police", "government", "govt", "gate",
-            "primary", "high", "new", "old", "town", "main", "cross", "road", "nagar", "extension"}
+            "primary", "high", "new", "old", "town", "main", "cross", "road", "nagar", "extension",
+            "st", "saint", "public"}  # "St. Paul's Public School" is not "St. Mary's Public School"
 
 
 # On an exact tie in score, which kind of place the caller most likely means: a suburb or town
