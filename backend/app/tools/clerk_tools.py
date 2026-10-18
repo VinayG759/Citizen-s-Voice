@@ -32,6 +32,10 @@ class ToolState:
     emergency_reason: str | None = None
     nearby_seen: dict[str, int] = field(default_factory=dict)  # tracking_id → number, from find_nearby_complaints
     report_count: int | None = None  # set when this call was added to an existing complaint
+    # What the clerk said just before the caller's latest words (set by the conversation; None when the
+    # tools are used on their own). A real read-back names the place.
+    last_reply: str | None = None
+    readback_refused: bool = False  # refused once at most, so a read-back we can't match never traps a caller
 
 
 SPECS = [
@@ -164,6 +168,14 @@ def file_complaint(state: ToolState, repo, session_info: dict, **a) -> dict:
     if problems:
         return {"ok": False, "not_filed": True, "fix": problems}
 
+    # CV-1013, 18 Oct: Gemma filed straight after "how long has it been?", taking an earlier "yes, that's
+    # the one" (about the place) as the caller's yes to a read-back that never happened.
+    if state.last_reply is not None and not state.readback_refused and not _names_place(state.last_reply, offered.place):
+        state.readback_refused = True
+        return {"ok": False, "not_filed": True,
+                "fix": ["read the complaint back first: the problem, the place and since when, in one sentence, "
+                        "and ask if it is right. File only after the caller says yes to that."]}
+
     same_as = (a.get("same_as") or "").strip().upper()
     if same_as and same_as not in state.nearby_seen:
         return {"ok": False, "not_filed": True,
@@ -209,6 +221,14 @@ def file_complaint(state: ToolState, repo, session_info: dict, **a) -> dict:
     state.filed = filed
     return {"ok": True, "tracking_id": filed.tracking_id, "say_tracking_id_as": spoken_id(filed.tracking_number),
             "place": p.label, "sent_to": department}
+
+
+def _names_place(text: str, place: gazetteer.Place) -> bool:
+    """Does the clerk's message name this place? Any distinctive word of its names will do."""
+    words = {w for name in (place.name_en, place.name_kn, *place.alt.split("|"))
+             for w in gazetteer.normalise(name).split() if len(w) >= 4 and w not in gazetteer._GENERIC}
+    said = gazetteer.normalise(text)
+    return not words or any(w in said for w in words)
 
 
 def find_nearby_complaints(state: ToolState, repo, place_id: str, category: str) -> dict:

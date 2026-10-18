@@ -5,7 +5,7 @@ from datetime import datetime
 from app.clerk import clerk as clerk_mod
 from app.clerk.clerk import Conversation
 from app.db.repo import ComplaintStatus, FiledComplaint
-from app.llm.types import LLMReply, ToolCall
+from app.llm.types import LLMReply, Msg, ToolCall
 from app.tools import clerk_tools
 
 PRESIDENCY = "osm-w780259661"
@@ -92,6 +92,7 @@ def test_the_caller_hears_they_are_the_fourth_reporter(monkeypatch):
     offer_presidency(conv.state)
     clerk_tools.find_nearby_complaints(conv.state, repo, PRESIDENCY, "road")
     conv.state.caller_turn = 1
+    conv.messages.append(Msg("model", "Potholes near Presidency University, already reported. Is that right?"))
     replies = iter([LLMReply("", [ToolCall("t1", "file_complaint", dict(
         category="road", summary_en="Potholes", place_id=PRESIDENCY, caller_confirmed=True, same_as="CV-1042"))],
         "fake", "fake", 5)])

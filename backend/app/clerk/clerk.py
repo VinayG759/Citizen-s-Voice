@@ -121,6 +121,7 @@ class Conversation:
         self.language = self.lock.update(language, caller_text)
         lang = self.language.split("-")[0]
         self.state.caller_turn += 1
+        self.state.last_reply = next((m.text for m in reversed(self.messages) if m.role == "model" and m.text), "")
         start = len(self.messages)
         note = ""
         if self.lock.pending:

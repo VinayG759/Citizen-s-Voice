@@ -8,7 +8,7 @@ from app.clerk import clerk as clerk_mod
 from app.clerk.clerk import Conversation
 from app.db.repo import ComplaintStatus, FiledComplaint
 from app.llm.router import foreign_script
-from app.llm.types import LLMError, LLMReply, ToolCall
+from app.llm.types import LLMError, LLMReply, Msg, ToolCall
 from app.tools import clerk_tools
 
 
@@ -91,6 +91,33 @@ def test_files_after_caller_confirms_with_coordinates_from_data(monkeypatch):
     assert result.complaint == {"tracking_id": "CV-1001"}
 
 
+def test_no_filing_without_a_read_back_naming_the_place(monkeypatch):
+    # CV-1013, 18 Oct: "How long has it been?" "For 2 days." -> filed at once, never read back.
+    repo = FakeRepo()
+    conv = Conversation(call_id=1, repo=repo, language="en-IN")
+    offer_presidency(conv.state)
+    conv.state.caller_turn = 1
+    conv.messages.append(Msg("model", "Okay. How long has this water leakage been happening?"))
+    filing = call("file_complaint", category="water", summary_en="Water leakage", place_id=PRESIDENCY,
+                  caller_confirmed=True)
+    scripted(monkeypatch, [filing, say("Water leakage near Presidency University for 2 days. Is that right?")])
+    conv.turn("For 2 days.")
+    assert repo.filed == []  # refused: read it back first
+    scripted(monkeypatch, [filing, say("Filed.")])
+    conv.turn("Yes")
+    assert len(repo.filed) == 1
+
+
+def test_a_read_back_we_cannot_match_is_refused_only_once():
+    state = clerk_tools.ToolState(last_reply="ಸರಿ, ಕೆರೆ ಹತ್ತಿರ ನೀರು ಸೋರಿಕೆ, ಸರಿನಾ?")  # place said some other way
+    offer_presidency(state)
+    state.caller_turn = 2
+    args = dict(category="water", summary_en="Leak", place_id=PRESIDENCY, caller_confirmed=True)
+    repo = FakeRepo()
+    assert clerk_tools.file_complaint(state, repo, {}, **args)["not_filed"]
+    assert clerk_tools.file_complaint(state, repo, {}, **args)["ok"]  # never a loop
+
+
 def test_a_place_gemma_made_up_is_refused(monkeypatch):
     repo = FakeRepo()
     conv = Conversation(call_id=1, repo=repo)
@@ -168,6 +195,7 @@ def test_after_filing_the_tracking_id_is_read_out_without_another_model_call(mon
     conv = Conversation(call_id=1, repo=repo, language="kn-IN")
     offer_presidency(conv.state)
     conv.state.caller_turn = 1
+    conv.messages.append(Msg("model", "Presidency University ಹತ್ತಿರ road ಅಲ್ಲಿ potholes, ಸರಿನಾ?"))  # the read-back
     scripted(monkeypatch, [
         call("file_complaint", category="road", summary_en="Potholes", place_id=PRESIDENCY, caller_confirmed=True),
         # no further reply scripted: a second model call would raise StopIteration
