@@ -1,4 +1,4 @@
-STATUS: waiting for the next Sara
+STATUS: taken over 2026-10-18
 
 > For the next Sara: you are the orchestrator (method in ~/.claude/CLAUDE.md). Vinay runs on Anthropic API credits: keep the session short. **Submission closes TODAY, Sun 18 Oct, 3:30 PM IST.** Your job: implement the rest of [plan-18-oct.md](plan-18-oct.md) in the order below, **code freeze 1:30 PM**, then push, test, rehearse. Read the plan's sections E1, E2, E3 and C2 before starting; they hold the findings and the simplest version of each.
 
