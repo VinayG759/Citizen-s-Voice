@@ -2,6 +2,8 @@
 
 from datetime import datetime
 
+import pytest
+
 from app.clerk import clerk as clerk_mod
 from app.clerk.clerk import Conversation
 from app.db.repo import ComplaintStatus, FiledComplaint
@@ -125,3 +127,20 @@ def test_forgetting_the_caller_blanks_the_call_rows_hash():
     repo_mod._forget_caller(session, 77)
     assert call.caller_hash is None
     repo_mod._forget_caller(session, None)  # nothing to forget: no lookup, no error
+
+
+@pytest.mark.parametrize("category,radius", [("road", 150), ("streetlight", 150), ("drainage", 150),
+                                             ("water", 500), ("electricity", 500), ("garbage", 500)])
+def test_the_same_problem_radius_depends_on_the_kind_of_problem(category, radius):
+    # A pothole is a point; no water is a whole street (plan E3, 18 Oct).
+    asked = []
+
+    class Spy(Repo):
+        def nearby_open(self, lat, lon, category, radius_m=150):
+            asked.append(radius_m)
+            return []
+
+    s = clerk_tools.ToolState()
+    offer_presidency(s)
+    clerk_tools.find_nearby_complaints(s, Spy(), PRESIDENCY, category)
+    assert asked == [radius]

@@ -80,7 +80,8 @@ SPECS = [
     ToolSpec(
         "find_nearby_complaints",
         "After the place is found and before the read-back: check whether this problem was already reported "
-        "within about 150 m. Returns open complaints of the same category nearby.",
+        "nearby (150 m for a pothole, streetlight, tree or drain; 500 m for water, power or garbage, which "
+        "affect a whole street). Returns open complaints of the same category nearby.",
         {"type": "object", "properties": {
             "place_id": {"type": "string", "description": "id of the place from find_place"},
             "category": {"type": "string", "enum": list(CATEGORIES)},
@@ -250,6 +251,13 @@ def _names_place(text: str, place: gazetteer.Place) -> bool:
     return not words or any(w in said for w in words)
 
 
+# How far apart two reports can be and still be the same problem. A pothole is a point; no water or
+# power is a whole street, so neighbours a few houses apart report the same outage.
+SAME_PROBLEM_M = 150
+SAME_PROBLEM_AREA_M = 500
+AREA_PROBLEMS = ("water", "electricity", "garbage")
+
+
 def find_nearby_complaints(state: ToolState, repo, place_id: str, category: str) -> dict:
     offered = state.offered.get(place_id or "")
     if offered is None:
@@ -258,7 +266,8 @@ def find_nearby_complaints(state: ToolState, repo, place_id: str, category: str)
         return {"error": f"category must be one of {list(CATEGORIES)}"}
     if category in ("safety", "corruption"):  # never merge people's sensitive reports together
         return {"matches": [], "note": "Sensitive reports are always filed on their own."}
-    found = repo.nearby_open(offered.place.lat, offered.place.lon, category)[:3]
+    radius = SAME_PROBLEM_AREA_M if category in AREA_PROBLEMS else SAME_PROBLEM_M
+    found = repo.nearby_open(offered.place.lat, offered.place.lon, category, radius_m=radius)[:3]
     for f in found:
         state.nearby_seen[f["tracking_id"]] = f["tracking_number"]
     if not found:
