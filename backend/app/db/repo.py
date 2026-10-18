@@ -313,6 +313,17 @@ def contact_for(tracking_number: int) -> tuple[str | None, dict | None]:
         return (c.contact_enc, public_complaint(c, officer=True)) if c else (None, None)
 
 
+def reporter_contacts(tracking_number: int) -> list[tuple[str, bool, str | None]]:
+    """Everyone who reported this problem and can be reached: (encrypted contact, is the original
+    reporter, their language). Sensitive reports keep no contact, so they never appear here."""
+    with Session(get_engine()) as s:
+        c = s.scalar(select(Complaint).where(Complaint.tracking_number == tracking_number))
+        if c is None:
+            return []
+        linked = s.scalars(select(Complaint).where(Complaint.duplicate_of == c.id).order_by(Complaint.id)).all()
+        return [(r.contact_enc, r.id == c.id, r.language) for r in [c, *linked] if r.contact_enc]
+
+
 def timeline(s: Session, complaint_id: int) -> list[dict]:
     return [{"status": t.status, "by": t.changed_by, "note": t.note, "at": t.created_at.isoformat()}
             for t in s.scalars(select(StatusChange).where(StatusChange.complaint_id == complaint_id)

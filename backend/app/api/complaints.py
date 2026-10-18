@@ -120,8 +120,15 @@ class StatusUpdate(BaseModel):
     note: str | None = None
 
 
+def _tell_citizens(background: BackgroundTasks, number: int, what: str, note: str | None = None,
+                   office: str | None = None) -> None:
+    """Chat citizens hear about every status change (in the background: never slows the officer)."""
+    from app.followup import notify_update  # imported here: needs the chat channels
+    background.add_task(notify_update, number, what, note, office)
+
+
 @router.post("/complaints/{tracking_id}/status", dependencies=[Depends(officer.require_officer)])
-def set_status(tracking_id: str, body: StatusUpdate) -> dict:
+def set_status(tracking_id: str, body: StatusUpdate, background: BackgroundTasks) -> dict:
     if body.status not in OFFICER_STATUSES or body.status == "fixed":
         # "Fixed" needs a photo: POST /complaints/{id}/fixed
         raise HTTPException(422, "status must be in_progress or reopened (use /fixed with a photo)")
@@ -129,6 +136,7 @@ def set_status(tracking_id: str, body: StatusUpdate) -> dict:
     if updated is None:
         raise HTTPException(404, "no such complaint")
     events.publish("complaint_updated", tracking_id=updated["tracking_id"], status=updated["status"])
+    _tell_citizens(background, _number(tracking_id), body.status, body.note)
     return _with_follow_up(updated)
 
 
@@ -138,13 +146,14 @@ class Route(BaseModel):
 
 
 @router.post("/complaints/{tracking_id}/route", dependencies=[Depends(officer.require_officer)])
-def route(tracking_id: str, body: Route) -> dict:
+def route(tracking_id: str, body: Route, background: BackgroundTasks) -> dict:
     if body.department not in DEPARTMENTS:
         raise HTTPException(422, "unknown office")
     updated = repo.reroute(_number(tracking_id), body.department, body.note)
     if updated is None:
         raise HTTPException(404, "no such complaint")
     events.publish("complaint_updated", tracking_id=updated["tracking_id"], department=updated["department"])
+    _tell_citizens(background, _number(tracking_id), "routed", body.note, officer.OFFICE_NAMES.get(body.department))
     return _with_follow_up(updated)
 
 
@@ -171,6 +180,7 @@ def mark_fixed(tracking_id: str, background: BackgroundTasks, photo: UploadFile 
     updated = repo.change_status(number, "fixed", "officer", " · ".join(x for x in (note, reason) if x))
     events.publish("complaint_updated", tracking_id=updated["tracking_id"], status="fixed",
                    gemma=(verdict or {}).get("looks_fixed"))
+    _tell_citizens(background, number, "fixed", note)  # the others who reported it; the first is asked below
     if get_settings().feature_callback:
         from app.followup import ask_citizen  # imported here: needs the phone/chat channels
         background.add_task(ask_citizen, number)

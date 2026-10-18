@@ -40,6 +40,9 @@ unclear = anything else: a question, unrelated talk, or you cannot tell."""
 
 # channel → send(address, tracking_number, complaint) -> bool (True: the question was sent)
 _chat_senders: dict[str, Callable[[str, int, dict], bool]] = {}
+# channel → send(address, text): a plain message, for status updates. Chats only: phone and browser
+# citizens are called once, after the fix, and hear the full status whenever they call in (18 Oct).
+_chat_notifiers: dict[str, Callable[[str, str], None]] = {}
 _in_flight: set[int] = set()  # one call-back at a time per complaint
 _lock = threading.Lock()
 
@@ -47,6 +50,52 @@ _lock = threading.Lock()
 def register_chat(channel: str, send: Callable[[str, int, dict], bool]) -> None:
     """For chat channels: how to send the "is it really fixed?" question to a chat address."""
     _chat_senders[channel] = send
+
+
+def register_notifier(channel: str, send: Callable[[str, str], None]) -> None:
+    """For chat channels: how to send a plain status-update message to a chat address."""
+    _chat_notifiers[channel] = send
+
+
+_UPDATE = {
+    "in_progress": {"en": "Update on {tid}: work on your complaint has started.",
+                    "kn": "{tid} ಬಗ್ಗೆ update: ನಿಮ್ಮ complaint ಮೇಲೆ ಕೆಲಸ ಶುರು ಆಗಿದೆ.",
+                    "hi": "{tid} पर अपडेट: आपकी शिकायत पर काम शुरू हो गया है।"},
+    "reopened": {"en": "Update on {tid}: your complaint has been reopened and will be looked at again.",
+                 "kn": "{tid} ಬಗ್ಗೆ update: ನಿಮ್ಮ complaint ಮತ್ತೆ open ಆಗಿದೆ, ಮತ್ತೆ ನೋಡ್ತಾರೆ.",
+                 "hi": "{tid} पर अपडेट: आपकी शिकायत फिर से खोली गई है, इसे दोबारा देखा जाएगा।"},
+    "routed": {"en": "Update on {tid}: your complaint has been sent to {office}, the office responsible.",
+               "kn": "{tid} ಬಗ್ಗೆ update: ನಿಮ್ಮ complaint ಅನ್ನು {office} ಗೆ ಕಳಿಸಲಾಗಿದೆ.",
+               "hi": "{tid} पर अपडेट: आपकी शिकायत {office} को भेजी गई है।"},
+    "fixed": {"en": "Update on {tid}: the officer has marked it fixed.",
+              "kn": "{tid} ಬಗ್ಗೆ update: officer ಇದನ್ನು fix ಆಗಿದೆ ಅಂತ mark ಮಾಡಿದ್ದಾರೆ.",
+              "hi": "{tid} पर अपडेट: अधिकारी ने इसे ठीक हुआ बताया है।"},
+}
+_NOTE = {"en": " Officer's note: {note}", "kn": " Officer note: {note}", "hi": " अधिकारी का नोट: {note}"}
+
+
+def update_text(what: str, tracking_number: int, language: str | None, note: str | None = None,
+                office: str | None = None) -> str:
+    lang = (language or "en").split("-")[0]
+    lang = lang if lang in _UPDATE[what] else "en"
+    text = _UPDATE[what][lang].format(tid=f"CV-{tracking_number}", office=office or "")
+    return text + (_NOTE[lang].format(note=note.strip()[:300]) if note and note.strip() else "")
+
+
+def notify_update(tracking_number: int, what: str, note: str | None = None, office: str | None = None) -> None:
+    """Tell everyone who reported it in a chat (the original reporter and any linked reports) what changed.
+    "fixed": the original reporter gets the "is it really fixed?" question instead (ask_citizen), so only
+    the others get this message. Best effort: a message that can't be sent never blocks the officer."""
+    for sealed, original, language in repo.reporter_contacts(tracking_number):
+        if what == "fixed" and original:
+            continue
+        contact = unseal(sealed)
+        if contact is None or contact[0] not in _chat_notifiers:
+            continue  # phone and browser citizens: called once, after the fix
+        try:
+            _chat_notifiers[contact[0]](contact[1], update_text(what, tracking_number, language, note, office))
+        except Exception:
+            log.exception("status update for CV-%s not sent on %s", tracking_number, contact[0])
 
 
 def within_calling_hours(now: datetime | None = None) -> bool:

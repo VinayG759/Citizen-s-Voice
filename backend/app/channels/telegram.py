@@ -106,6 +106,16 @@ def ask_fixed(chat_id: str, tracking_number: int, complaint: dict) -> bool:
 followup.register_chat("telegram", ask_fixed)
 
 
+def send_update(chat_id: str, text: str) -> None:
+    """A status update (app/followup.py notify_update)."""
+    token = get_settings().telegram_bot_token
+    if token:
+        TelegramApi(token).send_text(chat_id, text)
+
+
+followup.register_notifier("telegram", send_update)
+
+
 def _first_time(update_id: int) -> bool:
     with _seen_lock:
         if update_id in _seen:
