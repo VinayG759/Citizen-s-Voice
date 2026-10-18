@@ -28,7 +28,11 @@ From Tharun's test report (Telegram, St. Mary's School, T. Dasarahalli):
 1. **Unconfirmed:** did Tharun test the phone call, photos in chat, and the call-back after a fix? If so, update Q29 in `docs/judge-questions.md` (it still says "fakes only" for those).
 2. **Vobiz → Railway** (unconfirmed): Answer URL `…/api/phone/answer`, Hangup URL `…/api/phone/hangup`, both POST. Without them, the phone demo fails.
 3. **Judging morning:** from `backend/`, `python -m scripts.reset_demo` (dry run: read the host it prints) → `--yes`; then `python -m scripts.smoke_test https://citizens-voice-production.up.railway.app` must say READY. The reset deletes every complaint, Tharun's TEST ones included.
-4. Rehearse `docs/demo-script.md` three times; record the backup video.
+4. **Call-back showcase** (planned with Vinay 18 Oct; only works 9 AM–8 PM IST, `CALL_HOURS` in `backend/app/followup.py`):
+   a. **Test it for real first** (never tested live): phone complaint → officer: Start work, photo, Mark fixed → Vobiz should ring the filing phone → answer "no" → complaint reopens, words in the timeline. Same on Telegram (the bot asks in chat).
+   b. If it works, and Vinay agrees: the complaint page listens for the server's `callback` live events (already published by `followup._publish`, ignored by the web today) and shows "Calling the citizen…" then the result without a refresh.
+   c. Add the moment to `docs/demo-script.md` after "Mark fixed" (~20 s): the phone rings on stage, answer "ಇಲ್ಲ, ಇನ್ನೂ ಕತ್ತಲು ಇದೆ", it reopens. Fallback if no ring within 20 s: "the call-back is on its way", move on.
+5. Rehearse `docs/demo-script.md` three times; record the backup video **between 9 AM and 8 PM** (or the call-back won't fire).
 
 ## Vinay's open decisions
 
