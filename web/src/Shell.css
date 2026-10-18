@@ -299,6 +299,17 @@
   border-radius: var(--radius-md);
 }
 
+/* Brief tiles open the complaints behind the number */
+.tile--link {
+  color: inherit;
+  text-decoration: none;
+  height: 100%;
+}
+
+.tile--link:hover {
+  border-color: var(--accent);
+}
+
 .tile__value {
   font-size: var(--text-xl);
   font-weight: var(--weight-strong);

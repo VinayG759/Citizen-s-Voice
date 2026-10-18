@@ -164,6 +164,24 @@ test("a signed-in officer gets the brief once, and a spreadsheet button", async 
   expect(fetched(fetchMock, "/api/brief")).toBe(1);
 });
 
+test("each number on the brief opens the complaints behind it", async () => {
+  sessionStorage.setItem("cv-officer-token", "test-token");
+  const brief = {
+    facts: { window_hours: 24, new: 5, new_emergencies: 1, fixed: 2, open: 9, overdue: 3, worst_office: null,
+             clusters: [{ category: "water", area: "Jayanagar", complaints: 3, reports: 4 }] },
+    summary_en: "In the last 24 hours: 5 new complaints.", summary_local: null, source: "template",
+    numbers_checked: true, rejected_numbers: [],
+  };
+  mockFetch({ "/health": healthy, "/api/config": config, [NEWEST]: [], "/api/scorecard": [], "/api/brief": brief });
+  renderAt("/brief");
+  const fixed = await screen.findByRole("link", { name: "2 Fixed: show these complaints" });
+  expect(fixed).toHaveAttribute("href", "/complaints?status=fixed");
+  expect(screen.getByRole("link", { name: "1 Emergencies: show these complaints" })).toHaveAttribute("href", "/complaints?sort=priority");
+  expect(screen.getByRole("link", { name: /open water complaints near Jayanagar/ })).toHaveAttribute("href", "/complaints?category=water");
+  fireEvent.click(fixed);
+  expect(window.location.pathname + window.location.search).toBe("/complaints?status=fixed");
+});
+
 test("the phone menu opens, closes on Escape and returns focus to its button", async () => {
   mockFetch({ "/health": healthy, "/api/config": config, [NEWEST]: [], "/api/scorecard": [] });
   renderAt("/");

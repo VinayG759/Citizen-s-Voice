@@ -8,6 +8,7 @@ import { OfficerSignIn } from "../components/OfficerSignIn";
 import { PageHeader } from "../components/PageHeader";
 import { getBlob, userMessage } from "../lib/api";
 import { CATEGORY } from "../lib/complaints";
+import { Link } from "../lib/router";
 import { toast } from "../lib/toast";
 import { useShell, type Brief as BriefData } from "../ShellContext";
 
@@ -73,8 +74,14 @@ export function Brief() {
 
 function BriefBody({ data }: { data: BriefData }) {
   const f = data.facts;
-  const tiles: [string, number][] = [
-    [`New (${f.window_hours} h)`, f.new], ["Emergencies", f.new_emergencies], ["Fixed", f.fixed], ["Open now", f.open], ["Past deadline", f.overdue],
+  // Each number opens the complaints behind it. No overdue or emergency filter exists: "Most urgent first"
+  // ranks emergencies, then overdue complaints, at the top (officer.rank_key).
+  const tiles: [string, number, string][] = [
+    [`New (${f.window_hours} h)`, f.new, "/complaints"],
+    ["Emergencies", f.new_emergencies, "/complaints?sort=priority"],
+    ["Fixed", f.fixed, "/complaints?status=fixed"],
+    ["Open now", f.open, "/complaints?status=open"],
+    ["Past deadline", f.overdue, "/complaints?sort=priority"],
   ];
   return (
     <div className="brief">
@@ -87,10 +94,12 @@ function BriefBody({ data }: { data: BriefData }) {
         </p>
       </Card>
       <ul className="tiles" aria-label="Today's numbers">
-        {tiles.map(([label, value]) => (
-          <li key={label} className="tile">
-            <span className="tile__value">{value}</span>
-            <span className="tile__label">{label}</span>
+        {tiles.map(([label, value, to]) => (
+          <li key={label}>
+            <Link to={to} className="tile tile--link" aria-label={`${value} ${label}: show these complaints`}>
+              <span className="tile__value">{value}</span>
+              <span className="tile__label">{label}</span>
+            </Link>
           </li>
         ))}
       </ul>
@@ -98,7 +107,7 @@ function BriefBody({ data }: { data: BriefData }) {
         <Card title="Most overdue office">
           <p>
             <strong>{f.worst_office.office}</strong>: {f.worst_office.overdue} of its {f.worst_office.open} open complaints are past
-            the {f.worst_office.deadline_days}-day deadline.
+            the {f.worst_office.deadline_days}-day deadline. <Link to="/complaints?sort=priority">See the most urgent first</Link>
           </p>
         </Card>
       )}
@@ -107,7 +116,10 @@ function BriefBody({ data }: { data: BriefData }) {
           <ul className="brief__clusters">
             {f.clusters.map((c, i) => (
               <li key={i}>
-                {c.complaints} open {CATEGORY[c.category]?.label.toLowerCase() ?? c.category} complaints near {c.area} ({c.reports} reports)
+                <Link to={`/complaints?category=${encodeURIComponent(c.category)}`}>
+                  {c.complaints} open {CATEGORY[c.category]?.label.toLowerCase() ?? c.category} complaints near {c.area}
+                </Link>{" "}
+                ({c.reports} reports)
               </li>
             ))}
           </ul>
